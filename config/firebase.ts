@@ -7,7 +7,7 @@ import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyA2CCjZknuE0hp10K8LVm1Crvf-FgQwV6Y",
+  apiKey: "AI123123131231aSyA2CCjZknuE0hp112313212312K8LVm1Crvf-FgQwV6Y",
   authDomain: "ieeecompconnect.firebaseapp.com",
   projectId: "ieeecompconnect",
   storageBucket: "ieeecompconnect.firebasestorage.app",
