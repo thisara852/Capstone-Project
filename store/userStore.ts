@@ -54,12 +54,13 @@ export const useUserStore = create<UserStore>((set, get) => ({
   clearError: () => set({ error: null }),
 
   initializeAuth: () => {
+    set({ isLoading: true });
     onAuthStateChanged(auth, async (user) => {
       if (user) {
-        set({ user });
+        set({ user, isLoading: false });
         await get().fetchProfile(user.uid);
       } else {
-        set({ user: null, profile: null });
+        set({ user: null, profile: null, isLoading: false });
       }
     });
   },

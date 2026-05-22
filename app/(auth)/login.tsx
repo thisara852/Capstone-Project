@@ -31,15 +31,7 @@ export default function LoginScreen() {
     }
     clearError();
     await login(email.trim(), password);
-    const { user } = useUserStore.getState();
-    if (user) {
-      router.replace('/(tabs)');
-    }
-  };
-
-  // Demo login (bypass auth for development)
-  const handleDemoLogin = () => {
-    router.replace('/(tabs)');
+    // Root layout will automatically route to (tabs) when user state is set
   };
 
   return (
@@ -124,11 +116,6 @@ export default function LoginScreen() {
                   <Text style={styles.loginBtnText}>Sign In</Text>
                 )}
               </LinearGradient>
-            </TouchableOpacity>
-
-            {/* Demo Button */}
-            <TouchableOpacity style={styles.demoBtn} onPress={handleDemoLogin}>
-              <Text style={styles.demoBtnText}>🚀 Continue as Demo User</Text>
             </TouchableOpacity>
 
             <View style={styles.divider}>

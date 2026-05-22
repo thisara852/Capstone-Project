@@ -44,8 +44,7 @@ export default function RegisterScreen() {
       membershipType,
       interests: selectedInterests,
     });
-    const { user } = useUserStore.getState();
-    if (user) router.replace('/(tabs)');
+    // Root layout will automatically route to (tabs) when user state is set
   };
 
   return (

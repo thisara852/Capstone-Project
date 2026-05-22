@@ -1,4 +1,4 @@
-// Firebase configuration using hard-coded values (provided by user)
+// Firebase configuration using environment variables
 import { initializeApp, getApps } from 'firebase/app';
 import { Platform } from 'react-native';
 import { initializeAuth, getReactNativePersistence, getAuth } from 'firebase/auth';
@@ -7,13 +7,13 @@ import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
-  apiKey: "AI123123131231aSyA2CCjZknuE0hp112313212312K8LVm1Crvf-FgQwV6Y",
-  authDomain: "ieeecompconnect.firebaseapp.com",
-  projectId: "ieeecompconnect",
-  storageBucket: "ieeecompconnect.firebasestorage.app",
-  messagingSenderId: "434701516497",
-  appId: "1:434701516497:web:ca459beff84cafaf6bcff0",
-  measurementId: "G-C5Y4J0KYWD",
+  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
+  measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
 // Initialize Firebase only once
