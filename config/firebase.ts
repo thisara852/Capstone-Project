@@ -1,7 +1,8 @@
 // Firebase configuration using environment variables
 import { initializeApp, getApps } from 'firebase/app';
 import { Platform } from 'react-native';
-import { initializeAuth, getReactNativePersistence, getAuth } from 'firebase/auth';
+// @ts-ignore
+import { initializeAuth, getAuth, getReactNativePersistence } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';

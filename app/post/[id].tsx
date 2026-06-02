@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,9 @@ import {
   StyleSheet,
   Alert,
   Linking,
+  Platform,
+  Share,
+  TextInput,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -16,14 +19,65 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { format } from 'date-fns';
 import { useFeedStore } from '../../store/feedStore';
 import { useUserStore } from '../../store/userStore';
+import { useAdminStore } from '../../store/adminStore';
+import { useCompetitionStore } from '../../store/competitionStore';
+import { useRegistrationStore } from '../../store/registrationStore';
 import { Colors, Spacing, BorderRadius, FontSize, FontWeight } from '../../constants/theme';
+import { getOptimizedImageUrl } from '../../utils/cloudinary';
+import { EventRegistrationForm } from '../../components/forms/EventRegistrationForm';
 
 export default function PostDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { posts, toggleLike } = useFeedStore();
-  const { user } = useUserStore();
-  const post = useMemo(() => posts.find((p) => p.id === id), [posts, id]);
+  const { events: adminEvents } = useAdminStore();
+  const { myCompetitions } = useCompetitionStore();
+  const { user, profile } = useUserStore();
+  
+  const post = useMemo(() => {
+    return posts.find((p) => p.id === id) || 
+           adminEvents.find((p) => p.id === id) ||
+           myCompetitions.find((p) => p.id === id);
+  }, [posts, adminEvents, myCompetitions, id]);
+  
   const userId = user?.uid || 'demo-user';
+  const { isRegistered, currentRegistration, checkRegistrationStatus } = useRegistrationStore();
+  const [showRegForm, setShowRegForm] = useState(false);
+  
+  const isLiked = post?.likes?.includes(userId) || false;
+  const isSaved = profile?.savedPostIds?.includes(post?.id || '') || false;
+
+  useEffect(() => {
+    if (post && post.type === 'event' && user?.uid) {
+      checkRegistrationStatus(post.id, user.uid);
+    }
+  }, [post, user?.uid]);
+
+  let regStatusMessage = 'Register for Event';
+  let isRegActive = post?.registrationOpen !== false;
+
+  if (post?.type === 'event' && post.registrationStartDate && post.registrationEndDate) {
+    const now = Date.now();
+    if (now < post.registrationStartDate) {
+      isRegActive = false;
+      regStatusMessage = `Opens on ${format(new Date(post.registrationStartDate), 'MMM dd')}`;
+    } else if (now > post.registrationEndDate) {
+      isRegActive = false;
+      regStatusMessage = 'Registration Closed';
+    }
+  } else if (post?.type === 'event' && !isRegActive) {
+    regStatusMessage = 'Registration Closed';
+  }
+
+  React.useEffect(() => {
+    if (post && post.type === 'event' && user?.uid) {
+      checkRegistrationStatus(post.id, user.uid);
+    }
+  }, [post, user?.uid]);
+
+  const isCreatorOrganizer = post?.authorId === user?.uid;
+  const isAdmin = profile?.role === 'admin';
+  const isApprovedParticipant = currentRegistration?.status === 'approved' || currentRegistration?.status === 'checked-in';
+  const canAccessChat = post?.type === 'event' && (isCreatorOrganizer || isAdmin || isApprovedParticipant);
 
   if (!post) {
     return (
@@ -37,26 +91,11 @@ export default function PostDetailScreen() {
       </SafeAreaView>
     );
   }
+  // isLiked already defined above
 
-  const isLiked = post.likes.includes(userId);
-
-  const handleRegister = () => {
-    Alert.alert(
-      'Event Registration',
-      `You're registering for:\n"${post.title}"\n\nThis will connect you to the event group.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Register & Join Group',
-          onPress: () => {
-            Alert.alert('✅ Registered!', 'You have been added to the event group. Check Groups tab.', [
-              { text: 'View Groups', onPress: () => router.push('/(tabs)/groups') },
-              { text: 'OK' },
-            ]);
-          },
-        },
-      ]
-    );
+  const handleRegisterClick = () => {
+    if (profile?.role === 'admin' || profile?.role === 'organizer') return;
+    setShowRegForm(true);
   };
 
   return (
@@ -65,11 +104,13 @@ export default function PostDetailScreen() {
         {/* Image Header */}
         {post.imageUrl ? (
           <View style={styles.imageContainer}>
-            <Image source={{ uri: post.imageUrl }} style={styles.image} resizeMode="cover" />
-            <LinearGradient
-              colors={['rgba(0,0,0,0.4)', Colors.bgDark]}
-              style={StyleSheet.absoluteFillObject}
+            {/* Main Contained Image (No Cropping) */}
+            <Image 
+              source={{ uri: getOptimizedImageUrl(post.imageUrl) }} 
+              style={styles.image} 
+              resizeMode="contain" 
             />
+            
             <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
               <Ionicons name="arrow-back" size={22} color="#fff" />
             </TouchableOpacity>
@@ -130,6 +171,26 @@ export default function PostDetailScreen() {
                   {post.registrationOpen ? 'Registration Open' : 'Registration Closed'}
                 </Text>
               </View>
+              {post.participantLimit && (
+                <View style={styles.eventDetail}>
+                  <Ionicons name="stats-chart" size={16} color={Colors.primary} />
+                  <Text style={styles.eventDetailText}>
+                    {post.registeredCount || 0} / {post.participantLimit} Participants
+                  </Text>
+                </View>
+              )}
+              {post.category && (
+                <View style={styles.eventDetail}>
+                  <Ionicons name="grid-outline" size={16} color={Colors.accent} />
+                  <Text style={styles.eventDetailText}>{post.category}</Text>
+                </View>
+              )}
+              {post.rules && (
+                <View style={{ marginTop: Spacing.md }}>
+                  <Text style={[styles.eventDetailText, { fontWeight: 'bold', marginBottom: 4 }]}>Rules & Requirements:</Text>
+                  <Text style={[styles.eventDetailText, { lineHeight: 20 }]}>{post.rules}</Text>
+                </View>
+              )}
             </View>
           )}
 
@@ -141,41 +202,105 @@ export default function PostDetailScreen() {
 
           {/* Actions */}
           <View style={styles.actionsRow}>
-            <TouchableOpacity style={styles.actionBtn} onPress={() => toggleLike(post.id, userId)}>
+            <TouchableOpacity style={styles.actionBtn} onPress={() => {
+              console.log('Toggled Like on post details');
+              toggleLike(post.id, userId);
+            }}>
               <Ionicons name={isLiked ? 'heart' : 'heart-outline'} size={22} color={isLiked ? Colors.error : Colors.textSecondary} />
-              <Text style={styles.actionLabel}>{post.likes.length} Likes</Text>
+              <Text style={styles.actionLabel}>{post.likes?.length || 0} Likes</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.actionBtn}>
+            <TouchableOpacity style={styles.actionBtn} onPress={() => {
+              console.log('Navigating to comments');
+              router.push(`/post/${post.id}/comments`);
+            }}>
               <Ionicons name="chatbubble-outline" size={20} color={Colors.textSecondary} />
-              <Text style={styles.actionLabel}>{post.comments} Comments</Text>
+              <Text style={styles.actionLabel}>{post.comments || 0} Comments</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.actionBtn}>
+            <TouchableOpacity 
+              style={styles.actionBtn}
+              onPress={async () => {
+                console.log('Share clicked');
+                try {
+                  await Share.share({ message: `Check out "${post.title}" on IEEE CompConnect!` });
+                } catch (error) {
+                  console.error(error);
+                }
+              }}
+            >
               <Ionicons name="share-social-outline" size={22} color={Colors.textSecondary} />
               <Text style={styles.actionLabel}>Share</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.actionBtn}>
-              <Ionicons name="bookmark-outline" size={22} color={Colors.textSecondary} />
+            <TouchableOpacity style={styles.actionBtn} onPress={() => useUserStore.getState().toggleSavePost(post.id)}>
+              <Ionicons name={isSaved ? "bookmark" : "bookmark-outline"} size={22} color={isSaved ? Colors.primary : Colors.textSecondary} />
               <Text style={styles.actionLabel}>Save</Text>
             </TouchableOpacity>
           </View>
+
+          {/* Join Chat Button (if authorized) */}
+          {canAccessChat && (
+            <TouchableOpacity 
+              style={styles.chatBtn}
+              onPress={() => router.push(`/chat/${post.id}`)}
+            >
+              <Ionicons name="chatbubbles" size={20} color="#fff" />
+              <Text style={styles.chatBtnText}>Join Event Chat</Text>
+              <Ionicons name="arrow-forward" size={16} color="#fff" />
+            </TouchableOpacity>
+          )}
+
         </View>
       </ScrollView>
 
       {/* Bottom CTA for events */}
-      {post.type === 'event' && post.registrationOpen && (
+      {post.type === 'event' && profile?.role !== 'admin' && profile?.role !== 'organizer' && (
         <View style={styles.bottomCTA}>
-          <TouchableOpacity style={styles.registerBtn} onPress={handleRegister}>
-            <LinearGradient
-              colors={Colors.gradientPrimary as [string, string]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.registerGradient}
-            >
-              <Ionicons name="checkmark-circle" size={20} color="#fff" />
-              <Text style={styles.registerText}>Register for This Event</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+          {isRegistered ? (
+            <View style={[
+              styles.registerBtn, 
+              { backgroundColor: currentRegistration?.status === 'pending' ? Colors.warning + '22' : Colors.success + '22' }
+            ]}>
+              <Ionicons 
+                name={currentRegistration?.status === 'pending' ? 'time' : 'checkmark-circle'} 
+                size={20} 
+                color={currentRegistration?.status === 'pending' ? Colors.warning : Colors.success} 
+              />
+              <Text style={[
+                styles.registerText, 
+                { color: currentRegistration?.status === 'pending' ? Colors.warning : Colors.success }
+              ]}>
+                {currentRegistration?.status === 'pending' ? 'Pending Approval' : 'Registered'}
+              </Text>
+            </View>
+          ) : (
+            <View style={{ gap: Spacing.md }}>
+              <TouchableOpacity 
+                style={[styles.registerBtn, (!isRegActive) && { opacity: 0.6 }]} 
+                onPress={handleRegisterClick}
+                disabled={!isRegActive}
+              >
+              <LinearGradient
+                colors={Colors.gradientPrimary as [string, string]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.registerGradient}
+              >
+                <Text style={styles.registerText}>
+                  {regStatusMessage}
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
+            </View>
+          )}
         </View>
+      )}
+
+      {post && (
+        <EventRegistrationForm 
+          eventId={post.id}
+          registrationConfig={post.registrationConfig}
+          visible={showRegForm}
+          onClose={() => setShowRegForm(false)}
+        />
       )}
     </SafeAreaView>
   );
@@ -183,8 +308,18 @@ export default function PostDetailScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.bgDark },
-  imageContainer: { height: 300, position: 'relative' },
-  image: { width: '100%', height: '100%' },
+  imageContainer: { 
+    width: '100%', 
+    aspectRatio: 16 / 9, 
+    position: 'relative', 
+    backgroundColor: Colors.bgDark,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  image: { 
+    width: '100%', 
+    height: '100%', 
+  },
   backBtn: { position: 'absolute', top: 16, left: 16, width: 40, height: 40, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
   headerBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md },
   content: { padding: Spacing.lg, gap: Spacing.md },
@@ -212,4 +347,35 @@ const styles = StyleSheet.create({
   registerText: { color: '#fff', fontSize: FontSize.base, fontWeight: FontWeight.bold },
   notFound: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   notFoundText: { color: Colors.textMuted, fontSize: FontSize.lg },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.bgCard,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: Spacing.md,
+    height: 50,
+  },
+  input: {
+    flex: 1,
+    marginLeft: Spacing.sm,
+    color: Colors.textPrimary,
+    fontSize: FontSize.md,
+  },
+  chatBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.primary,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    marginTop: Spacing.xl,
+    gap: Spacing.sm,
+  },
+  chatBtnText: {
+    color: '#fff',
+    fontSize: FontSize.md,
+    fontWeight: 'bold',
+  },
 });

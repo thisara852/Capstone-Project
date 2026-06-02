@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFeedStore } from '../../store/feedStore';
+import { useGroupStore } from '../../store/groupStore';
 import { extractSearchKeywords, getSearchSuggestions } from '../../services/nlpService';
 import { IEEE_BRANCHES, IEEE_TOPICS } from '../../config/api';
 import { Colors, Spacing, BorderRadius, FontSize, FontWeight } from '../../constants/theme';
@@ -22,8 +23,15 @@ const TRENDING = ['AI Workshop', 'Hackathon 2026', 'Quantum Computing', 'Cyberse
 
 export default function SearchScreen() {
   const [query, setQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'posts' | 'branches' | 'news'>('posts');
-  const { posts, news, fetchIEEENews, isLoading } = useFeedStore();
+  const [activeTab, setActiveTab] = useState<'posts' | 'communities' | 'branches' | 'news'>('posts');
+  const { posts, news, fetchIEEENews, fetchPosts, isLoading } = useFeedStore();
+  const { groups, fetchGroups } = useGroupStore();
+
+  useEffect(() => {
+    if (posts.length === 0) {
+      fetchPosts();
+    }
+  }, []);
 
   const suggestions = getSearchSuggestions(query, IEEE_TOPICS);
 
@@ -43,6 +51,13 @@ export default function SearchScreen() {
           b.city.toLowerCase().includes(query.toLowerCase())
       )
     : IEEE_BRANCHES;
+
+  const filteredGroups = query.trim()
+    ? groups.filter(g => 
+        g.name.toLowerCase().includes(query.toLowerCase()) || 
+        g.description?.toLowerCase().includes(query.toLowerCase())
+      )
+    : groups;
 
   const handleNewsSearch = useCallback(async () => {
     if (query.trim()) {
@@ -107,13 +122,14 @@ export default function SearchScreen() {
 
       {/* Tabs */}
       <View style={styles.tabs}>
-        {(['posts', 'branches', 'news'] as const).map((tab) => (
+        {(['posts', 'communities', 'branches', 'news'] as const).map((tab) => (
           <TouchableOpacity
             key={tab}
             style={[styles.tab, activeTab === tab && styles.tabActive]}
             onPress={() => {
               setActiveTab(tab);
               if (tab === 'news') handleNewsSearch();
+              if (tab === 'communities' && groups.length === 0) fetchGroups('All');
             }}
           >
             <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
@@ -144,6 +160,33 @@ export default function SearchScreen() {
                 <Text style={styles.resultTitle} numberOfLines={2}>{item.title}</Text>
                 <Text style={styles.resultMeta}>{item.author}</Text>
               </View>
+            </TouchableOpacity>
+          )}
+        />
+      )}
+
+      {!isLoading && activeTab === 'communities' && (
+        <FlatList
+          data={filteredGroups}
+          keyExtractor={(item) => item.id}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.list}
+          renderItem={({ item }) => (
+            <TouchableOpacity style={styles.branchCard} onPress={() => router.push(`/group/${item.id}`)}>
+              <View style={styles.branchAvatar}>
+                {item.avatar ? (
+                  <Image source={{uri: item.avatar}} style={{width: 48, height: 48, borderRadius: 24}} />
+                ) : (
+                  <Text style={styles.branchAvatarText}>{item.name[0]}</Text>
+                )}
+              </View>
+              <View style={styles.branchInfo}>
+                <Text style={styles.branchName}>{item.name}</Text>
+                <Text style={styles.branchCity}>
+                  <Ionicons name="people" size={12} color={Colors.textMuted} /> {item.memberCount} members
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
             </TouchableOpacity>
           )}
         />

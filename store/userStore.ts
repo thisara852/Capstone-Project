@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { auth, db } from '../config/firebase';
 import {
   createUserWithEmailAndPassword,
@@ -6,26 +8,67 @@ import {
   signOut,
   onAuthStateChanged,
   User,
+  sendPasswordResetEmail,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  updatePassword,
 } from 'firebase/auth';
 import {
   doc,
   setDoc,
   getDoc,
   updateDoc,
+  onSnapshot,
+  arrayUnion,
+  arrayRemove,
 } from 'firebase/firestore';
+import { useFeedStore } from './feedStore';
+import { useNotificationStore } from './notificationStore';
+import { useGroupStore } from './groupStore';
+import { useRegistrationStore } from './registrationStore';
+import { useCompetitionStore } from './competitionStore';
+import { useChatStore } from './chatStore';
+import { useAdminStore } from './adminStore';
 
 export interface UserProfile {
   uid: string;
   email: string;
   displayName: string;
+  role: 'student' | 'organizer' | 'admin';
   photoURL?: string;
-  branch: string;
-  university: string;
-  membershipType: 'Student' | 'Graduate' | 'Professional';
-  interests: string[];
-  joinedGroups: string[];
+  // Student fields
+  branch?: string;
+  university?: string;
+  department?: string;
+  membershipType?: 'Student' | 'Graduate' | 'Professional';
+  interests?: string[];
+  joinedGroups?: string[];
+  savedPostIds?: string[];
+  studentId?: string;
+  github?: string;
+  verificationDocuments?: {
+    idDocument?: string | null;
+    ieeeProof?: string | null;
+    appointmentLetter?: string | null;
+    logo?: string | null;
+  };
+  organizationMemberships?: string[];
+  // Organizer fields
+  organizationName?: string;
+  ieeeSection?: string;
+  organizationDescription?: string;
+  verificationStatus?: 'pending' | 'verified' | 'rejected';
+  // Privacy & Settings fields
+  isProfilePublic?: boolean;
+  shareDataWithOrganizers?: boolean;
+  deactivated?: boolean;
+  // Common fields
+  verified?: boolean;
+  phoneNumber?: string;
+  contactNumber?: string;
   bio?: string;
   linkedIn?: string;
+  website?: string;
   createdAt: number;
 }
 
@@ -33,7 +76,11 @@ interface UserStore {
   user: User | null;
   profile: UserProfile | null;
   isLoading: boolean;
+  isInitializing: boolean;
+  isFetchingProfile: boolean;
   error: string | null;
+  profileUnsubscribe: (() => void) | null;
+  authUnsubscribe: (() => void) | null;
 
   // Auth actions
   login: (email: string, password: string) => Promise<void>;
@@ -41,28 +88,61 @@ interface UserStore {
   logout: () => Promise<void>;
   fetchProfile: (uid: string) => Promise<void>;
   updateProfile: (data: Partial<UserProfile>) => Promise<void>;
+  updateUserPassword: (currentPass: string, newPass: string) => Promise<void>;
+  deactivateUserAccount: (password: string) => Promise<void>;
+  toggleSavePost: (postId: string) => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
   initializeAuth: () => void;
   clearError: () => void;
 }
 
-export const useUserStore = create<UserStore>((set, get) => ({
-  user: null,
-  profile: null,
-  isLoading: false,
-  error: null,
+export const useUserStore = create<UserStore>()(
+  persist(
+    (set, get) => ({
+      user: null,
+      profile: null,
+      isLoading: true,
+      isInitializing: true,
+      isFetchingProfile: false,
+      error: null,
+      profileUnsubscribe: null,
+      authUnsubscribe: null,
 
   clearError: () => set({ error: null }),
 
   initializeAuth: () => {
-    set({ isLoading: true });
-    onAuthStateChanged(auth, async (user) => {
+    const { authUnsubscribe } = get();
+    if (authUnsubscribe) authUnsubscribe();
+
+    set({ isInitializing: true });
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        set({ user, isLoading: false });
-        await get().fetchProfile(user.uid);
+        // Immediately unblock the UI with the cached user session
+        set({ user, isLoading: false, isInitializing: false });
+        
+        // Fetch the latest profile data in the background
+        get().fetchProfile(user.uid).catch(err => {
+          console.warn("Background profile fetch failed:", err);
+        });
       } else {
-        set({ user: null, profile: null, isLoading: false });
+        const { profileUnsubscribe } = get();
+        if (profileUnsubscribe) profileUnsubscribe();
+        
+        // Synchronous cleanup — no dynamic imports needed
+        try {
+          useFeedStore.getState().cleanup();
+          useNotificationStore.getState().cleanup();
+          useGroupStore.getState().cleanup();
+          useRegistrationStore.getState().cleanup();
+          useCompetitionStore.getState().cleanup();
+          useChatStore.getState().cleanup();
+          useAdminStore.getState().cleanup();
+        } catch (e) {}
+
+        set({ user: null, profile: null, isLoading: false, isInitializing: false, profileUnsubscribe: null, isFetchingProfile: false });
       }
     });
+    set({ authUnsubscribe: unsubscribe });
   },
 
   login: async (email, password) => {
@@ -70,9 +150,23 @@ export const useUserStore = create<UserStore>((set, get) => ({
     try {
       const credential = await signInWithEmailAndPassword(auth, email, password);
       set({ user: credential.user });
-      await get().fetchProfile(credential.user.uid);
+      // Profile fetch is handled by onAuthStateChanged — no duplicate call needed
     } catch (err: any) {
-      set({ error: err.message || 'Login failed' });
+      let errorMessage = 'Login failed. Please try again.';
+      if (
+        err.code === 'auth/invalid-credential' || 
+        err.code === 'auth/user-not-found' || 
+        err.code === 'auth/wrong-password' ||
+        err.code === 'auth/invalid-email'
+      ) {
+        errorMessage = 'Invalid email or password.';
+      } else if (err.code === 'auth/too-many-requests') {
+        errorMessage = 'Too many failed login attempts. Please try again later.';
+      } else if (err.message) {
+        // Fallback to Firebase's message but strip the 'Firebase: ' prefix if present
+        errorMessage = err.message.replace(/^Firebase:\s*/, '');
+      }
+      set({ error: errorMessage });
     } finally {
       set({ isLoading: false });
     }
@@ -82,56 +176,240 @@ export const useUserStore = create<UserStore>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const credential = await createUserWithEmailAndPassword(auth, email, password);
-      const newProfile: UserProfile = {
+      
+      const baseProfile = {
         uid: credential.user.uid,
         email,
         displayName: profileData.displayName || email.split('@')[0],
-        branch: profileData.branch || '',
-        university: profileData.university || '',
-        membershipType: profileData.membershipType || 'Student',
-        interests: profileData.interests || [],
-        joinedGroups: [],
+        role: profileData.role || 'student',
         bio: profileData.bio || '',
         linkedIn: profileData.linkedIn || '',
         createdAt: Date.now(),
       };
+
+      let newProfile: UserProfile;
+
+      if (profileData.role === 'organizer') {
+        newProfile = {
+          ...baseProfile,
+          role: 'organizer',
+          organizationName: profileData.organizationName || '',
+          ieeeSection: profileData.ieeeSection || '',
+          organizationDescription: profileData.organizationDescription || '',
+          verificationStatus: 'pending',
+          verified: false,
+          contactNumber: profileData.contactNumber || '',
+          website: profileData.website || '',
+        };
+      } else {
+        newProfile = {
+          ...baseProfile,
+          role: 'student',
+          branch: profileData.branch || '',
+          university: profileData.university || '',
+          department: profileData.department || '',
+          membershipType: profileData.membershipType || 'Student',
+          interests: profileData.interests || [],
+          phoneNumber: profileData.phoneNumber || '',
+          verified: true,
+          joinedGroups: [],
+        };
+      }
+
       await setDoc(doc(db, 'users', credential.user.uid), newProfile);
+      await get().fetchProfile(credential.user.uid);
       set({ user: credential.user, profile: newProfile });
     } catch (err: any) {
-      set({ error: err.message || 'Registration failed' });
+      let errorMessage = 'Registration failed. Please try again.';
+      if (err.code === 'auth/email-already-in-use') {
+        errorMessage = 'This email is already in use. Please sign in instead.';
+      } else if (err.code === 'auth/invalid-email') {
+        errorMessage = 'Please enter a valid email address.';
+      } else if (err.code === 'auth/weak-password') {
+        errorMessage = 'Password is too weak. It must be at least 6 characters.';
+      } else if (err.message) {
+        errorMessage = err.message.replace(/^Firebase:\s*/, '');
+      }
+      set({ error: errorMessage });
     } finally {
       set({ isLoading: false });
     }
   },
 
   logout: async () => {
+    const { profileUnsubscribe } = get();
+    if (profileUnsubscribe) profileUnsubscribe();
+    
+    // Synchronous cleanup — all stores are already loaded in memory
+    try {
+      useFeedStore.getState().cleanup();
+      useNotificationStore.getState().cleanup();
+      useGroupStore.getState().cleanup();
+      useRegistrationStore.getState().cleanup();
+      useCompetitionStore.getState().cleanup();
+      useChatStore.getState().cleanup();
+      useAdminStore.getState().cleanup();
+    } catch (e) {}
+
     await signOut(auth);
-    set({ user: null, profile: null });
+    set({ user: null, profile: null, profileUnsubscribe: null });
   },
 
   fetchProfile: async (uid) => {
+    const { profileUnsubscribe, isFetchingProfile } = get();
+    if (isFetchingProfile) return; // Prevent concurrent fetches
+    
+    if (profileUnsubscribe) profileUnsubscribe();
+
+    set({ isFetchingProfile: true });
     try {
-      const snap = await getDoc(doc(db, 'users', uid));
-      if (snap.exists()) {
-        set({ profile: snap.data() as UserProfile });
+      // First, fetch profile immediately for faster login
+      const docSnap = await getDoc(doc(db, 'users', uid));
+      
+      // Prevent setting up listeners if the user logged out while getDoc was running
+      const currentUser = get().user;
+      if (!currentUser || currentUser.uid !== uid) {
+        set({ isFetchingProfile: false });
+        return;
       }
+
+      if (docSnap.exists()) {
+        set({ profile: docSnap.data() as UserProfile });
+      }
+
+      // Then set up real-time listener for updates
+      const unsubscribe = onSnapshot(doc(db, 'users', uid), (doc) => {
+        if (doc.exists()) {
+          set({ profile: doc.data() as UserProfile });
+        }
+      }, (error) => {
+        console.warn('Failed to fetch profile real-time:', error.message);
+      });
+
+      // Cleanup any listener that might have been created by concurrent fetchProfile calls (just in case)
+      const { profileUnsubscribe: existingUnsubscribe } = get();
+      if (existingUnsubscribe) existingUnsubscribe();
+
+      set({ profileUnsubscribe: unsubscribe, isFetchingProfile: false });
     } catch (err: any) {
-      // Use console.warn instead of console.error to avoid React Native LogBox red screen when offline
-      console.warn('Failed to fetch profile (device might be offline):', err.message || err);
+      console.warn('Failed to setup profile listener:', err.message || err);
+      set({ isFetchingProfile: false });
     }
   },
 
   updateProfile: async (data) => {
     const { user, profile } = get();
     if (!user || !profile) return;
-    set({ isLoading: true });
+    
+    set({ isLoading: true, error: null });
     try {
       await updateDoc(doc(db, 'users', user.uid), data);
-      set({ profile: { ...profile, ...data } as UserProfile });
+      set({ profile: { ...profile, ...data } });
     } catch (err: any) {
-      set({ error: err.message });
+      set({ error: err.message || 'Failed to update profile' });
     } finally {
       set({ isLoading: false });
     }
   },
-}));
+
+  updateUserPassword: async (currentPass, newPass) => {
+    const { user } = get();
+    if (!user || !user.email) return;
+
+    set({ isLoading: true, error: null });
+    try {
+      const credential = EmailAuthProvider.credential(user.email, currentPass);
+      await reauthenticateWithCredential(user, credential);
+      await updatePassword(user, newPass);
+    } catch (err: any) {
+      let msg = 'Failed to update password.';
+      if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') msg = 'Incorrect current password.';
+      if (err.code === 'auth/weak-password') msg = 'New password is too weak.';
+      set({ error: msg });
+      throw new Error(msg); // Let caller handle UI failure
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  deactivateUserAccount: async (password) => {
+    const { user } = get();
+    if (!user || !user.email) return;
+
+    set({ isLoading: true, error: null });
+    try {
+      const credential = EmailAuthProvider.credential(user.email, password);
+      await reauthenticateWithCredential(user, credential);
+      
+      // Update profile in DB to deactivated
+      await updateDoc(doc(db, 'users', user.uid), { deactivated: true });
+      
+      // Log the user out (which handles cleanup)
+      await get().logout();
+    } catch (err: any) {
+      let msg = 'Failed to deactivate account.';
+      if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') msg = 'Incorrect password.';
+      set({ error: msg });
+      throw new Error(msg);
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  toggleSavePost: async (postId) => {
+    const { user, profile } = get();
+    if (!user || !profile) return;
+    
+    const savedPostIds = profile.savedPostIds || [];
+    const isSaved = savedPostIds.includes(postId);
+    
+    // Optimistic update
+    const newSaved = isSaved 
+      ? savedPostIds.filter(id => id !== postId) 
+      : [...savedPostIds, postId];
+      
+    set({ profile: { ...profile, savedPostIds: newSaved } });
+    
+    try {
+      await updateDoc(doc(db, 'users', user.uid), {
+        savedPostIds: isSaved ? arrayRemove(postId) : arrayUnion(postId)
+      });
+    } catch (err) {
+      console.error("Failed to save post", err);
+      // Revert on failure
+      set({ profile: { ...profile, savedPostIds } });
+    }
+  },
+
+  resetPassword: async (email) => {
+    set({ isLoading: true, error: null });
+    try {
+      console.log('Sending password reset email to:', email);
+      await sendPasswordResetEmail(auth, email);
+      console.log('Password reset email sent successfully');
+      // Success - error will be null
+    } catch (err: any) {
+      console.error('Password reset error:', err.code, err.message);
+      let errorMessage = 'Failed to send password reset email.';
+      if (err.code === 'auth/user-not-found') {
+        errorMessage = 'No account found with this email address.';
+      } else if (err.code === 'auth/invalid-email') {
+        errorMessage = 'Please enter a valid email address.';
+      } else if (err.code === 'auth/too-many-requests') {
+        errorMessage = 'Too many requests. Please try again later.';
+      } else if (err.message) {
+        errorMessage = err.message.replace(/^Firebase:\s*/, '');
+      }
+      set({ error: errorMessage });
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+    }),
+    {
+      name: 'user-storage',
+      storage: createJSONStorage(() => AsyncStorage),
+      partialize: (state) => ({ profile: state.profile }),
+    }
+  )
+);

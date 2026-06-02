@@ -54,11 +54,34 @@ export async function classifyText(text: string, candidateLabels: string[]): Pro
  */
 export function rankPostsByInterests(posts: Post[], interests: string[]): Post[] {
   if (!interests.length) return posts;
-  const scored = posts.map((post) => ({
-    post,
-    score: keywordScore(post, interests),
-  }));
-  scored.sort((a, b) => b.score - a.score);
+  
+  const now = Date.now();
+  
+  const scored = posts.map((post) => {
+    let score = keywordScore(post, interests);
+    
+    // Recency Bias: Boost score for newly published posts
+    // so they aren't completely buried by older relevant posts.
+    if (post.createdAt) {
+      const hoursOld = (now - post.createdAt) / (1000 * 60 * 60);
+      if (hoursOld <= 24) {
+        score += 2.0; // Strong boost (last 24 hrs)
+      } else if (hoursOld <= 72) {
+        score += 1.0; // Mild boost (last 3 days)
+      }
+    }
+    
+    return { post, score };
+  });
+
+  scored.sort((a, b) => {
+    if (b.score !== a.score) {
+      return b.score - a.score; // Primary: Relevance + Recency Score
+    }
+    // Secondary: Chronological Order (Newest First)
+    return (b.post.createdAt || 0) - (a.post.createdAt || 0);
+  });
+  
   return scored.map((s) => s.post);
 }
 
@@ -70,7 +93,7 @@ export function extractSearchKeywords(query: string): string[] {
   return query
     .toLowerCase()
     .split(/\s+/)
-    .filter((word) => word.length > 2 && !stopWords.has(word));
+    .filter((word) => word.length >= 2 && !stopWords.has(word));
 }
 
 /**

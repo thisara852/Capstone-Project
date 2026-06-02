@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   Linking,
+  Alert,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -127,11 +128,26 @@ export default function BranchDetailScreen() {
           <Text style={styles.sectionTitle}>Connect</Text>
           <View style={styles.connectRow}>
             {[
-              { icon: 'logo-linkedin', label: 'LinkedIn', color: '#0077B5' },
-              { icon: 'logo-facebook', label: 'Facebook', color: '#1877F2' },
-              { icon: 'mail', label: 'Email', color: Colors.accent },
+              { icon: 'logo-linkedin', label: 'LinkedIn', color: '#0077B5', url: 'https://linkedin.com/company/ieee' },
+              { icon: 'logo-facebook', label: 'Facebook', color: '#1877F2', url: 'https://facebook.com/ieee' },
+              { icon: 'mail', label: 'Email', color: Colors.accent, url: `mailto:branch-${id}@ieee.org` },
             ].map((s) => (
-              <TouchableOpacity key={s.label} style={[styles.socialBtn, { borderColor: s.color + '44' }]}>
+              <TouchableOpacity 
+                key={s.label} 
+                style={[styles.socialBtn, { borderColor: s.color + '44' }]}
+                onPress={async () => {
+                  try {
+                    const supported = await Linking.canOpenURL(s.url);
+                    if (supported) {
+                      await Linking.openURL(s.url);
+                    } else {
+                      Alert.alert('Error', `Cannot open ${s.label} link`);
+                    }
+                  } catch (e) {
+                    Alert.alert('Error', 'An error occurred while trying to open the link');
+                  }
+                }}
+              >
                 <Ionicons name={s.icon as any} size={20} color={s.color} />
                 <Text style={[styles.socialLabel, { color: s.color }]}>{s.label}</Text>
               </TouchableOpacity>

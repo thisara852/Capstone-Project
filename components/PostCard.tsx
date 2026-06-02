@@ -6,12 +6,17 @@ import {
   Image,
   StyleSheet,
   Dimensions,
+  Share,
 } from 'react-native';
+import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { format } from 'date-fns';
 import { Post } from '../store/feedStore';
+import { useUserStore } from '../store/userStore';
+import { useRegistrationStore } from '../store/registrationStore';
 import { Colors, BorderRadius, FontSize, Spacing, FontWeight } from '../constants/theme';
+import { getOptimizedImageUrl } from '../utils/cloudinary';
 
 const { width } = Dimensions.get('window');
 
@@ -23,6 +28,27 @@ interface PostCardProps {
 }
 
 export function PostCard({ post, onPress, onLike, isLiked }: PostCardProps) {
+  const { profile, toggleSavePost } = useUserStore();
+  const { userTickets } = useRegistrationStore();
+  
+  const isSaved = profile?.savedPostIds?.includes(post.id) || false;
+  const isOrganizer = profile?.role === 'organizer' || profile?.role === 'admin';
+
+  // Find if the logged-in user has a ticket for this specific event
+  const myTicket = post.type === 'event'
+    ? userTickets.find(t => t.eventId === post.id)
+    : undefined;
+
+  const handleShare = async () => {
+    try {
+      await Share.share({
+        message: `Check out "${post.title}" on IEEE CompConnect!`,
+      });
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
   const typeColors: Record<string, string> = {
     event: Colors.accentGold,
     article: Colors.primaryLight,
@@ -41,7 +67,7 @@ export function PostCard({ post, onPress, onLike, isLiked }: PostCardProps) {
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.9}>
       {post.imageUrl && (
         <View style={styles.imageContainer}>
-          <Image source={{ uri: post.imageUrl }} style={styles.image} resizeMode="cover" />
+          <Image source={{ uri: getOptimizedImageUrl(post.imageUrl) }} style={styles.image} resizeMode="cover" />
           <LinearGradient
             colors={['transparent', 'rgba(10,15,30,0.95)']}
             style={styles.imageGradient}
@@ -71,25 +97,41 @@ export function PostCard({ post, onPress, onLike, isLiked }: PostCardProps) {
         {/* Summary */}
         <Text style={styles.summary} numberOfLines={2}>{post.summary}</Text>
 
-        {/* Event info */}
-        {post.type === 'event' && post.eventDate && (
-          <View style={styles.eventInfo}>
-            <Ionicons name="calendar-outline" size={12} color={Colors.accentGold} />
-            <Text style={styles.eventDate}>
-              {format(new Date(post.eventDate), 'MMM dd, yyyy')}
-            </Text>
-            {post.eventLocation && (
-              <>
-                <Ionicons name="location-outline" size={12} color={Colors.textSecondary} style={{ marginLeft: 8 }} />
-                <Text style={styles.eventLocation} numberOfLines={1}>{post.eventLocation}</Text>
-              </>
+        {/* Event Details (Organizer, Branch, Date, Location) */}
+        {post.type === 'event' && (
+          <View style={styles.eventDetailsContainer}>
+            <View style={styles.eventDetailRow}>
+              <Ionicons name="business" size={14} color={Colors.primary} />
+              <Text style={styles.organizerText} numberOfLines={1}>
+                Organized by <Text style={{fontWeight: 'bold', color: Colors.textPrimary}}>{post.author}</Text>
+                {post.branch ? ` • ${post.branch}` : ''}
+              </Text>
+            </View>
+            
+            {post.eventDate && (
+              <View style={[styles.eventDetailRow, { marginTop: 6 }]}>
+                <Ionicons name="calendar" size={14} color={Colors.accentGold} />
+                <Text style={styles.eventDate}>
+                  {format(new Date(post.eventDate), 'MMM dd, yyyy')}
+                </Text>
+                {post.eventLocation && (
+                  <>
+                    <View style={styles.dotSeparator} />
+                    <Ionicons name="location" size={14} color={Colors.textSecondary} />
+                    <Text style={styles.eventLocation} numberOfLines={1}>{post.eventLocation}</Text>
+                  </>
+                )}
+              </View>
             )}
           </View>
         )}
 
         {/* Footer */}
         <View style={styles.footer}>
-          <View style={styles.authorRow}>
+          <TouchableOpacity 
+            style={styles.authorRow}
+            onPress={() => router.push(`/user/${post.authorId}`)}
+          >
             <View style={styles.authorAvatar}>
               <Text style={styles.authorInitial}>{post.author[0]}</Text>
             </View>
@@ -97,9 +139,10 @@ export function PostCard({ post, onPress, onLike, isLiked }: PostCardProps) {
               <Text style={styles.authorName} numberOfLines={1}>{post.author}</Text>
               <Text style={styles.timeAgo}>
                 {format(new Date(post.createdAt), 'MMM dd')}
+                {post.type === 'article' && post.readTime ? ` • ${post.readTime} min read` : ''}
               </Text>
             </View>
-          </View>
+          </TouchableOpacity>
 
           <View style={styles.actions}>
             <TouchableOpacity style={styles.actionBtn} onPress={onLike}>
@@ -110,18 +153,67 @@ export function PostCard({ post, onPress, onLike, isLiked }: PostCardProps) {
               />
               <Text style={styles.actionCount}>{post.likes.length}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.actionBtn}>
+            <TouchableOpacity style={styles.actionBtn} onPress={() => router.push(`/post/${post.id}/comments`)}>
               <Ionicons name="chatbubble-outline" size={16} color={Colors.textSecondary} />
-              <Text style={styles.actionCount}>{post.comments}</Text>
+              <Text style={styles.actionCount}>{post.comments || 0}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.actionBtn}>
+            <TouchableOpacity style={styles.actionBtn} onPress={handleShare}>
               <Ionicons name="share-social-outline" size={18} color={Colors.textSecondary} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionBtn} onPress={() => toggleSavePost(post.id)}>
+              <Ionicons 
+                name={isSaved ? "bookmark" : "bookmark-outline"} 
+                size={18} 
+                color={isSaved ? Colors.primary : Colors.textSecondary} 
+              />
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Register button for events */}
-        {post.type === 'event' && post.registrationOpen && (
+        {/* Registration status badge or Register button for events */}
+        {post.type === 'event' && !isOrganizer && (() => {
+          if (!myTicket && post.registrationOpen) {
+            return (
+              <TouchableOpacity style={styles.registerBtn} onPress={onPress}>
+                <LinearGradient
+                  colors={Colors.gradientPrimary as [string, string]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.registerGradient}
+                >
+                  <Text style={styles.registerText}>Register Now</Text>
+                  <Ionicons name="arrow-forward" size={14} color="#fff" />
+                </LinearGradient>
+              </TouchableOpacity>
+            );
+          }
+          if (myTicket?.status === 'pending') {
+            return (
+              <View style={[styles.statusBadge, { backgroundColor: Colors.warning + '22', borderColor: Colors.warning }]}>
+                <Ionicons name="time-outline" size={14} color={Colors.warning} />
+                <Text style={[styles.statusBadgeText, { color: Colors.warning }]}>Pending Approval</Text>
+              </View>
+            );
+          }
+          if (myTicket?.status === 'approved' || myTicket?.status === 'checked-in') {
+            return (
+              <View style={[styles.statusBadge, { backgroundColor: Colors.success + '22', borderColor: Colors.success }]}>
+                <Ionicons name="checkmark-circle" size={14} color={Colors.success} />
+                <Text style={[styles.statusBadgeText, { color: Colors.success }]}>Registered</Text>
+              </View>
+            );
+          }
+          if (myTicket?.status === 'rejected') {
+            return (
+              <View style={[styles.statusBadge, { backgroundColor: Colors.error + '22', borderColor: Colors.error }]}>
+                <Ionicons name="close-circle" size={14} color={Colors.error} />
+                <Text style={[styles.statusBadgeText, { color: Colors.error }]}>Registration Rejected</Text>
+              </View>
+            );
+          }
+          return null;
+        })()}
+        {post.type === 'event' && isOrganizer && post.registrationOpen && (
           <TouchableOpacity style={styles.registerBtn} onPress={onPress}>
             <LinearGradient
               colors={Colors.gradientPrimary as [string, string]}
@@ -129,7 +221,7 @@ export function PostCard({ post, onPress, onLike, isLiked }: PostCardProps) {
               end={{ x: 1, y: 0 }}
               style={styles.registerGradient}
             >
-              <Text style={styles.registerText}>Register Now</Text>
+              <Text style={styles.registerText}>View Details</Text>
               <Ionicons name="arrow-forward" size={14} color="#fff" />
             </LinearGradient>
           </TouchableOpacity>
@@ -213,21 +305,37 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     lineHeight: 20,
   },
-  eventInfo: {
+  eventDetailsContainer: {
+    backgroundColor: Colors.bgSurface,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+  },
+  eventDetailRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: Colors.bgSurface,
-    padding: Spacing.sm,
-    borderRadius: BorderRadius.sm,
+    gap: 6,
+  },
+  organizerText: {
+    fontSize: FontSize.xs,
+    color: Colors.textSecondary,
+    flex: 1,
   },
   eventDate: {
-    fontSize: FontSize.sm,
+    fontSize: FontSize.xs,
     color: Colors.accentGold,
-    fontWeight: FontWeight.medium,
+    fontWeight: FontWeight.bold,
+  },
+  dotSeparator: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: Colors.textMuted,
+    marginHorizontal: 4,
   },
   eventLocation: {
-    fontSize: FontSize.sm,
+    fontSize: FontSize.xs,
     color: Colors.textSecondary,
     flex: 1,
   },
@@ -294,6 +402,21 @@ const styles = StyleSheet.create({
   },
   registerText: {
     color: '#fff',
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.bold,
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 4,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+  },
+  statusBadgeText: {
     fontSize: FontSize.sm,
     fontWeight: FontWeight.bold,
   },

@@ -30,8 +30,8 @@ export function GroupCard({ group, onPress, onJoin, isJoined }: GroupCardProps) 
 
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.9}>
-      {group.coverImage && (
-        <Image source={{ uri: group.coverImage }} style={styles.cover} resizeMode="cover" />
+      {group.banner && (
+        <Image source={{ uri: group.banner }} style={styles.cover} resizeMode="cover" />
       )}
       <LinearGradient
         colors={['transparent', 'rgba(10,15,30,0.98)']}
@@ -49,7 +49,7 @@ export function GroupCard({ group, onPress, onJoin, isJoined }: GroupCardProps) 
           <View style={styles.members}>
             <Ionicons name="people" size={14} color={Colors.textSecondary} />
             <Text style={styles.memberCount}>{group.memberCount} members</Text>
-            {group.isPrivate && (
+            {group.visibility === 'private' && (
               <Ionicons name="lock-closed" size={12} color={Colors.textMuted} style={{ marginLeft: 6 }} />
             )}
           </View>

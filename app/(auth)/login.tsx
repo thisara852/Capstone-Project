@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,8 +10,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Modal,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -22,7 +24,26 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const { login, isLoading, error, clearError } = useUserStore();
+  const [showForgotModal, setShowForgotModal] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const { user, login, isLoading, error, clearError, resetPassword } = useUserStore();
+  const { isLoading: resetLoading } = useUserStore();
+
+  // Auto-redirect if Firebase restores the session in the background
+  useEffect(() => {
+    if (user) {
+      // Use setTimeout to avoid 'Attempted to navigate before mounting' crashes
+      setTimeout(() => {
+        router.replace('/(tabs)');
+      }, 0);
+    }
+  }, [user]);
+
+  useFocusEffect(
+    useCallback(() => {
+      clearError();
+    }, [])
+  );
 
   const handleLogin = async () => {
     if (!email.trim() || !password) {
@@ -31,16 +52,51 @@ export default function LoginScreen() {
     }
     clearError();
     await login(email.trim(), password);
-    // Root layout will automatically route to (tabs) when user state is set
+    
+    // Navigate immediately if login succeeded (no error was set)
+    const { error: loginError } = useUserStore.getState();
+    if (!loginError) {
+      router.replace('/(tabs)');
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!resetEmail.trim()) {
+      Alert.alert('Email Required', 'Please enter your email address.');
+      return;
+    }
+
+    await resetPassword(resetEmail.trim());
+    const { error: resetError } = useUserStore.getState();
+    
+    if (!resetError) {
+      setShowForgotModal(false);
+      setResetEmail('');
+      Alert.alert(
+        'Password Reset Email Sent',
+        'Check your email for instructions to reset your password.',
+        [{ text: 'OK' }]
+      );
+    }
+  };
+
+  const handleCloseForgotModal = () => {
+    setShowForgotModal(false);
+    setResetEmail('');
+    clearError();
   };
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <ScrollView contentContainerStyle={styles.container}>
+        <ScrollView 
+          contentContainerStyle={styles.container}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
           {/* Header */}
           <View style={styles.header}>
             <LinearGradient
@@ -99,7 +155,10 @@ export default function LoginScreen() {
               </View>
             </View>
 
-            <TouchableOpacity style={styles.forgotBtn}>
+            <TouchableOpacity 
+              style={styles.forgotBtn}
+              onPress={() => setShowForgotModal(true)}
+            >
               <Text style={styles.forgotText}>Forgot password?</Text>
             </TouchableOpacity>
 
@@ -136,6 +195,76 @@ export default function LoginScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Forgot Password Modal */}
+      <Modal
+        visible={showForgotModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={handleCloseForgotModal}
+        statusBarTranslucent
+      >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{flex: 1}}>
+          <View style={styles.modalOverlay}>
+            <LinearGradient colors={[Colors.bgCard, '#1A1F30']} style={styles.modalContent}>
+              <View style={styles.modalIconWrap}>
+                <Ionicons name="lock-closed" size={32} color={Colors.primary} />
+              </View>
+              <Text style={styles.modalTitle}>Reset Password</Text>
+
+            <Text style={styles.modalDescription}>
+              Enter your email address and we'll send you a link to reset your password.
+            </Text>
+
+            {error && (
+              <View style={styles.errorBox}>
+                <Ionicons name="alert-circle" size={16} color={Colors.error} />
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            )}
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Email Address</Text>
+              <View style={styles.inputWrapper}>
+                <Ionicons name="mail-outline" size={18} color={Colors.textMuted} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="your@ieee.org"
+                  placeholderTextColor={Colors.textMuted}
+                  value={resetEmail}
+                  onChangeText={setResetEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  editable={!resetLoading}
+                />
+              </View>
+            </View>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity 
+                style={styles.modalCancelBtn}
+                onPress={handleCloseForgotModal}
+                disabled={resetLoading}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.modalSubmitBtn}
+                onPress={handleForgotPassword}
+                disabled={resetLoading}
+              >
+                {resetLoading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.modalSubmitText}>Send Reset Link</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </LinearGradient>
+        </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -299,4 +428,15 @@ const styles = StyleSheet.create({
     color: Colors.primaryLight,
     fontWeight: FontWeight.bold,
   },
+  // Modal Styles
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', padding: Spacing.xl },
+  modalContent: { width: '100%', borderRadius: BorderRadius.xl, padding: Spacing.xl, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', shadowColor: Colors.primary, shadowOffset: {width: 0, height: 10}, shadowOpacity: 0.3, shadowRadius: 20, elevation: 15 },
+  modalIconWrap: { width: 70, height: 70, borderRadius: 35, backgroundColor: Colors.primary + '15', justifyContent: 'center', alignItems: 'center', marginBottom: Spacing.md, borderWidth: 1, borderColor: Colors.primary + '30' },
+  modalTitle: { fontSize: FontSize.xxl, fontWeight: FontWeight.extraBold, color: Colors.textPrimary, marginBottom: Spacing.xs },
+  modalDescription: { fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center', marginBottom: Spacing.xl, lineHeight: 20 },
+  modalActions: { flexDirection: 'row', gap: Spacing.md, width: '100%', marginTop: 10 },
+  modalCancelBtn: { flex: 1, paddingVertical: 14, borderRadius: BorderRadius.full, backgroundColor: 'transparent', alignItems: 'center', borderWidth: 1, borderColor: Colors.border },
+  modalCancelText: { color: Colors.textPrimary, fontSize: FontSize.md, fontWeight: 'bold' },
+  modalSubmitBtn: { flex: 1, paddingVertical: 14, borderRadius: BorderRadius.full, backgroundColor: Colors.primary, alignItems: 'center', shadowColor: Colors.primary, shadowOffset: {width: 0, height: 4}, shadowOpacity: 0.4, shadowRadius: 8, elevation: 5, justifyContent: 'center' },
+  modalSubmitText: { color: '#fff', fontSize: FontSize.md, fontWeight: 'bold' },
 });

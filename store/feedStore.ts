@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { db } from '../config/firebase';
 import {
   collection,
@@ -14,6 +16,9 @@ import {
   arrayUnion,
   arrayRemove,
   Timestamp,
+  onSnapshot,
+  increment,
+  deleteDoc,
 } from 'firebase/firestore';
 import axios from 'axios';
 import { NEWSAPI_BASE_URL, NEWSAPI_KEY } from '../config/api';
@@ -35,6 +40,25 @@ export interface Post {
   eventDate?: number;
   eventLocation?: string;
   registrationOpen?: boolean;
+  status?: 'pending' | 'approved' | 'rejected';
+  participantLimit?: number;
+  rules?: string;
+  category?: string;
+  eventStatus?: 'upcoming' | 'ongoing' | 'completed' | 'cancelled';
+  registeredCount?: number;
+  registrationStartDate?: number;
+  registrationEndDate?: number;
+  // Article Specific Fields
+  readTime?: number;
+  updatedAt?: number;
+  published?: boolean;
+  featured?: boolean;
+  registrationConfig?: {
+    requiresStudentId?: boolean;
+    requiresResume?: boolean;
+    requiresIeeeProof?: boolean;
+    customQuestions?: string[];
+  };
 }
 
 export interface NewsItem {
@@ -48,17 +72,35 @@ export interface NewsItem {
   category: string;
 }
 
+export interface Comment {
+  id: string;
+  postId: string;
+  userId: string;
+  userName: string;
+  userAvatar?: string;
+  text: string;
+  createdAt: number;
+}
+
 interface FeedStore {
   posts: Post[];
   news: NewsItem[];
+  comments: Record<string, Comment[]>;
   isLoading: boolean;
   error: string | null;
   userInterests: string[];
 
-  fetchPosts: (interests?: string[]) => Promise<void>;
+  fetchPosts: (interests?: string[]) => void;
   fetchIEEENews: (topic?: string) => Promise<void>;
   toggleLike: (postId: string, userId: string) => Promise<void>;
   createPost: (post: Omit<Post, 'id'>) => Promise<string>;
+  seedDatabase: () => Promise<void>;
+  fetchComments: (postId: string) => () => void;
+  addComment: (postId: string, text: string) => Promise<void>;
+  deleteComment: (postId: string, commentId: string) => Promise<void>;
+  clearError: () => void;
+  postsUnsubscribe: (() => void) | null;
+  cleanup: () => void;
 }
 
 // Mock posts for when Firebase isn't connected
@@ -74,7 +116,7 @@ const MOCK_POSTS: Post[] = [
     branch: 'sliit',
     tags: ['AI', 'Machine Learning', 'Workshop'],
     likes: [],
-    comments: 14,
+    comments: 0,
     createdAt: Date.now() - 86400000,
     type: 'event',
     eventDate: Date.now() + 7 * 86400000,
@@ -92,7 +134,7 @@ const MOCK_POSTS: Post[] = [
     branch: 'all',
     tags: ['Quantum Computing', 'Research', 'Innovation'],
     likes: [],
-    comments: 32,
+    comments: 0,
     createdAt: Date.now() - 3600000 * 3,
     type: 'article',
   },
@@ -107,7 +149,7 @@ const MOCK_POSTS: Post[] = [
     branch: 'mrt',
     tags: ['Hackathon', 'Competition', 'Networking'],
     likes: [],
-    comments: 56,
+    comments: 0,
     createdAt: Date.now() - 86400000 * 2,
     type: 'event',
     eventDate: Date.now() + 14 * 86400000,
@@ -125,7 +167,7 @@ const MOCK_POSTS: Post[] = [
     branch: 'cmb',
     tags: ['Cybersecurity', 'AI', 'Seminar'],
     likes: [],
-    comments: 8,
+    comments: 0,
     createdAt: Date.now() - 86400000 * 3,
     type: 'event',
     eventDate: Date.now() + 3 * 86400000,
@@ -143,37 +185,90 @@ const MOCK_POSTS: Post[] = [
     branch: 'all',
     tags: ['Award', 'Achievement', 'IEEE Region 10'],
     likes: [],
-    comments: 41,
+    comments: 0,
     createdAt: Date.now() - 86400000 * 5,
     type: 'announcement',
   },
 ];
 
-export const useFeedStore = create<FeedStore>((set, get) => ({
-  posts: MOCK_POSTS,
+const MOCK_NEWS: NewsItem[] = [
+  {
+    id: 'mock-news-1',
+    title: 'IEEE Announces Global Expansion of Quantum Computing Initiatives',
+    description: 'IEEE launches a comprehensive program to accelerate research and standardization in quantum computing globally.',
+    url: 'https://ieee.org',
+    urlToImage: 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=800',
+    publishedAt: new Date(Date.now() - 3600000).toISOString(),
+    source: 'IEEE Spectrum',
+    category: 'technology',
+  },
+  {
+    id: 'mock-news-2',
+    title: 'New Advancements in AI Ethics Standards',
+    description: 'The IEEE Standards Association has published a new framework for evaluating the ethical implications of autonomous systems.',
+    url: 'https://ieee.org',
+    urlToImage: 'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=800',
+    publishedAt: new Date(Date.now() - 86400000).toISOString(),
+    source: 'IEEE News',
+    category: 'technology',
+  },
+];
+
+export const useFeedStore = create<FeedStore>()(
+  persist(
+    (set, get) => ({
+      posts: MOCK_POSTS,
   news: [],
+  comments: {},
   isLoading: false,
   error: null,
   userInterests: [],
+  postsUnsubscribe: null,
 
-  fetchPosts: async (interests = []) => {
+  cleanup: () => {
+    const { postsUnsubscribe } = get();
+    if (postsUnsubscribe) postsUnsubscribe();
+    set({ postsUnsubscribe: null });
+  },
+
+  fetchPosts: (interests = []) => {
+    const { postsUnsubscribe } = get();
+    if (postsUnsubscribe) postsUnsubscribe();
+
     set({ isLoading: true, error: null });
     try {
       const postsRef = collection(db, 'posts');
-      const q = query(postsRef, orderBy('createdAt', 'desc'), limit(20));
-      const snap = await getDocs(q);
-      if (snap.empty) {
-        // Use mock data if no Firestore data
-        set({ posts: MOCK_POSTS });
-      } else {
-        const posts = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Post));
-        set({ posts });
-      }
+      const q = query(postsRef, orderBy('createdAt', 'desc'), limit(50));
+      
+      const unsubscribe = onSnapshot(q, (snap) => {
+        if (snap.empty) {
+          // Seed the database with mock data if it's completely empty
+          console.log('Firestore is empty. Seeding database with initial data...');
+          get().seedDatabase();
+        } else {
+          let fetchedPosts = snap.docs.map((d) => {
+            const data = d.data();
+            return { 
+              id: d.id, 
+              ...data,
+              createdAt: data.createdAt?.toMillis ? data.createdAt.toMillis() : data.createdAt,
+              eventDate: data.eventDate?.toMillis ? data.eventDate.toMillis() : data.eventDate,
+              registrationStartDate: data.registrationStartDate?.toMillis ? data.registrationStartDate.toMillis() : data.registrationStartDate,
+              registrationEndDate: data.registrationEndDate?.toMillis ? data.registrationEndDate.toMillis() : data.registrationEndDate
+            } as Post;
+          });
+          // Filter out pending and rejected events
+          fetchedPosts = fetchedPosts.filter((p) => p.status !== 'pending' && p.status !== 'rejected');
+          set({ posts: fetchedPosts, isLoading: false });
+        }
+      }, (err) => {
+        console.error("Feed error:", err);
+        set({ posts: MOCK_POSTS, isLoading: false });
+      });
+
+      set({ postsUnsubscribe: unsubscribe });
     } catch (err) {
-      // Fallback to mock data
-      set({ posts: MOCK_POSTS });
-    } finally {
-      set({ isLoading: false });
+      set({ posts: MOCK_POSTS, isLoading: false });
     }
   },
 
@@ -202,6 +297,7 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
       set({ news: articles });
     } catch (err) {
       console.log('NewsAPI unavailable, using mock data');
+      set({ news: MOCK_NEWS });
     } finally {
       set({ isLoading: false });
     }
@@ -239,4 +335,102 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
       return `local-${Date.now()}`;
     }
   },
-}));
+
+  seedDatabase: async () => {
+    set({ isLoading: true });
+    try {
+      const { writeBatch } = await import('firebase/firestore');
+      const batch = writeBatch(db);
+      
+      MOCK_POSTS.forEach(post => {
+        const ref = doc(db, 'posts', post.id);
+        batch.set(ref, post);
+      });
+      
+      await batch.commit();
+      console.log('Database seeded successfully!');
+    } catch (err) {
+      console.error('Failed to seed database:', err);
+      throw err;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  fetchComments: (postId) => {
+    const q = query(
+      collection(db, 'posts', postId, 'comments'),
+      orderBy('createdAt', 'desc')
+    );
+    
+    return onSnapshot(q, (snap) => {
+      const fetchedComments = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Comment));
+      set((state) => ({
+        comments: { ...state.comments, [postId]: fetchedComments },
+      }));
+    }, (err) => {
+      console.error("Comments error:", err);
+    });
+  },
+
+  addComment: async (postId, text) => {
+    try {
+      const { useUserStore } = await import('./userStore');
+      const { user, profile } = useUserStore.getState();
+      
+      // If profile not loaded yet, wait a moment for it to load
+      if (!user || !profile) {
+        // Retry after a short delay
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const { user: retryUser, profile: retryProfile } = useUserStore.getState();
+        if (!retryUser || !retryProfile) {
+          throw new Error("Please wait for profile to load before posting comments.");
+        }
+      }
+
+      const { user: finalUser, profile: finalProfile } = useUserStore.getState();
+      
+      // We don't optimistically update here because the onSnapshot will catch it immediately
+      await addDoc(collection(db, 'posts', postId, 'comments'), {
+        postId,
+        userId: finalUser!.uid,
+        userName: finalProfile!.displayName || 'User',
+        text,
+        createdAt: Date.now(),
+      });
+      
+      // Also increment the comment count on the post document
+      await updateDoc(doc(db, 'posts', postId), {
+        comments: increment(1)
+      });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to add comment';
+      console.error("Failed to add comment:", errorMessage);
+      set({ error: errorMessage });
+    }
+  },
+
+  deleteComment: async (postId: string, commentId: string) => {
+    try {
+      await deleteDoc(doc(db, 'posts', postId, 'comments', commentId));
+      
+      // Decrement the comment count
+      await updateDoc(doc(db, 'posts', postId), {
+        comments: increment(-1)
+      });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to delete comment';
+      console.error("Failed to delete comment:", errorMessage);
+      set({ error: errorMessage });
+    }
+  },
+
+  clearError: () => set({ error: null }),
+    }),
+    {
+      name: 'feed-storage',
+      storage: createJSONStorage(() => AsyncStorage),
+      partialize: (state) => ({ posts: state.posts, news: state.news }),
+    }
+  )
+);
