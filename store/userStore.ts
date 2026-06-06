@@ -184,6 +184,7 @@ export const useUserStore = create<UserStore>()(
         role: profileData.role || 'student',
         bio: profileData.bio || '',
         linkedIn: profileData.linkedIn || '',
+        photoURL: profileData.photoURL || '',
         createdAt: Date.now(),
       };
 
@@ -252,7 +253,7 @@ export const useUserStore = create<UserStore>()(
     } catch (e) {}
 
     await signOut(auth);
-    set({ user: null, profile: null, profileUnsubscribe: null });
+    set({ user: null, profile: null, profileUnsubscribe: null, isFetchingProfile: false, isLoading: false });
   },
 
   fetchProfile: async (uid) => {

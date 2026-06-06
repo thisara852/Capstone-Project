@@ -90,7 +90,7 @@ interface FeedStore {
   error: string | null;
   userInterests: string[];
 
-  fetchPosts: (interests?: string[]) => void;
+  fetchPosts: (interests?: string[]) => Promise<void>;
   fetchIEEENews: (topic?: string) => Promise<void>;
   toggleLike: (postId: string, userId: string) => Promise<void>;
   createPost: (post: Omit<Post, 'id'>) => Promise<string>;
@@ -232,44 +232,62 @@ export const useFeedStore = create<FeedStore>()(
   },
 
   fetchPosts: (interests = []) => {
-    const { postsUnsubscribe } = get();
-    if (postsUnsubscribe) postsUnsubscribe();
+    return new Promise<void>((resolve, reject) => {
+      const { postsUnsubscribe } = get();
+      if (postsUnsubscribe) postsUnsubscribe();
 
-    set({ isLoading: true, error: null });
-    try {
-      const postsRef = collection(db, 'posts');
-      const q = query(postsRef, orderBy('createdAt', 'desc'), limit(50));
-      
-      const unsubscribe = onSnapshot(q, (snap) => {
-        if (snap.empty) {
-          // Seed the database with mock data if it's completely empty
-          console.log('Firestore is empty. Seeding database with initial data...');
-          get().seedDatabase();
-        } else {
-          let fetchedPosts = snap.docs.map((d) => {
-            const data = d.data();
-            return { 
-              id: d.id, 
-              ...data,
-              createdAt: data.createdAt?.toMillis ? data.createdAt.toMillis() : data.createdAt,
-              eventDate: data.eventDate?.toMillis ? data.eventDate.toMillis() : data.eventDate,
-              registrationStartDate: data.registrationStartDate?.toMillis ? data.registrationStartDate.toMillis() : data.registrationStartDate,
-              registrationEndDate: data.registrationEndDate?.toMillis ? data.registrationEndDate.toMillis() : data.registrationEndDate
-            } as Post;
-          });
-          // Filter out pending and rejected events
-          fetchedPosts = fetchedPosts.filter((p) => p.status !== 'pending' && p.status !== 'rejected');
-          set({ posts: fetchedPosts, isLoading: false });
-        }
-      }, (err) => {
-        console.error("Feed error:", err);
-        set({ posts: MOCK_POSTS, isLoading: false });
-      });
+      set({ isLoading: true, error: null });
+      try {
+        const postsRef = collection(db, 'posts');
+        const q = query(postsRef, orderBy('createdAt', 'desc'), limit(50));
+        
+        let isFirstFetch = true;
+        const unsubscribe = onSnapshot(q, (snap) => {
+          if (snap.empty) {
+            // Seed the database with mock data if it's completely empty
+            console.log('Firestore is empty. Seeding database with initial data...');
+            get().seedDatabase();
+            if (isFirstFetch) {
+              isFirstFetch = false;
+              resolve();
+            }
+          } else {
+            let fetchedPosts = snap.docs.map((d) => {
+              const data = d.data();
+              return { 
+                id: d.id, 
+                ...data,
+                createdAt: data.createdAt?.toMillis ? data.createdAt.toMillis() : data.createdAt,
+                eventDate: data.eventDate?.toMillis ? data.eventDate.toMillis() : data.eventDate,
+                registrationStartDate: data.registrationStartDate?.toMillis ? data.registrationStartDate.toMillis() : data.registrationStartDate,
+                registrationEndDate: data.registrationEndDate?.toMillis ? data.registrationEndDate.toMillis() : data.registrationEndDate
+              } as Post;
+            });
+            // Filter out pending and rejected events
+            fetchedPosts = fetchedPosts.filter((p) => p.status !== 'pending' && p.status !== 'rejected');
+            set({ posts: fetchedPosts, isLoading: false });
+            
+            if (isFirstFetch) {
+              isFirstFetch = false;
+              resolve();
+            }
+          }
+        }, (err) => {
+          console.error("Feed error:", err);
+          set({ error: err.message, isLoading: false });
+          if (isFirstFetch) {
+            isFirstFetch = false;
+            reject(err);
+          }
+        });
 
-      set({ postsUnsubscribe: unsubscribe });
-    } catch (err) {
-      set({ posts: MOCK_POSTS, isLoading: false });
-    }
+        set({ postsUnsubscribe: unsubscribe });
+      } catch (err: any) {
+        console.error(err);
+        set({ error: err.message, isLoading: false });
+        reject(err);
+      }
+    });
   },
 
   fetchIEEENews: async (topic = 'IEEE technology') => {

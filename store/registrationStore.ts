@@ -67,7 +67,7 @@ interface RegistrationStore {
   registerForEvent: (eventId: string, extraData?: Partial<Registration>) => Promise<void>;
   checkRegistrationStatus: (eventId: string, userId: string) => void;
   fetchEventRegistrations: (eventId: string) => void;
-  fetchUserTickets: (userId: string) => void;
+  fetchUserTickets: (userId: string) => Promise<void>;
   updateRegistrationStatus: (eventId: string, userId: string, status: Registration['status']) => Promise<void>;
   cleanup: () => void;
 }
@@ -113,7 +113,7 @@ export const useRegistrationStore = create<RegistrationStore>()(
         registeredAt: Date.now(),
         userDisplayName: profile.displayName || 'Unknown User',
         userEmail: profile.email || '',
-        userAvatar: profile.avatar || '',
+        userAvatar: profile.photoURL || '',
         studentId: extraData?.studentId || '',
         userUniversity: profile.university || 'Not specified',
         userBranch: profile.branch || 'Not specified',
@@ -179,38 +179,51 @@ export const useRegistrationStore = create<RegistrationStore>()(
   },
 
   fetchUserTickets: (userId) => {
-    set({ isLoading: true, error: null });
-    
-    // Unsubscribe from any previous listeners
-    const { userTicketsUnsubscribe } = get();
-    if (userTicketsUnsubscribe) {
-      userTicketsUnsubscribe();
-    }
+    return new Promise<void>((resolve, reject) => {
+      set({ isLoading: true, error: null });
+      
+      // Unsubscribe from any previous listeners
+      const { userTicketsUnsubscribe } = get();
+      if (userTicketsUnsubscribe) {
+        userTicketsUnsubscribe();
+      }
 
-    try {
-      const q = query(
-        collectionGroup(db, 'registrations'),
-        where('userId', '==', userId)
-      );
+      try {
+        const q = query(
+          collectionGroup(db, 'registrations'),
+          where('userId', '==', userId)
+        );
 
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        const tickets: Registration[] = [];
-        snapshot.forEach((docSnap) => {
-          tickets.push({ id: docSnap.id, ...docSnap.data() } as Registration);
+        let isFirstFetch = true;
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+          const tickets: Registration[] = [];
+          snapshot.forEach((docSnap) => {
+            tickets.push({ id: docSnap.id, ...docSnap.data() } as Registration);
+          });
+          
+          tickets.sort((a, b) => b.registeredAt - a.registeredAt);
+          set({ userTickets: tickets, isLoading: false });
+          
+          if (isFirstFetch) {
+            isFirstFetch = false;
+            resolve();
+          }
+        }, (err) => {
+          console.error("Tickets listener error:", err);
+          set({ error: err.message || 'Failed to fetch tickets', isLoading: false });
+          if (isFirstFetch) {
+            isFirstFetch = false;
+            reject(err);
+          }
         });
-        
-        tickets.sort((a, b) => b.registeredAt - a.registeredAt);
-        set({ userTickets: tickets, isLoading: false });
-      }, (err) => {
-        console.error("Tickets listener error:", err);
-        set({ error: err.message || 'Failed to fetch tickets', isLoading: false });
-      });
 
-      set({ userTicketsUnsubscribe: unsubscribe });
-    } catch (err: any) {
-      console.error("Error fetching tickets:", err);
-      set({ error: err.message || 'Failed to fetch tickets', isLoading: false });
-    }
+        set({ userTicketsUnsubscribe: unsubscribe });
+      } catch (err: any) {
+        console.error("Error fetching tickets:", err);
+        set({ error: err.message || 'Failed to fetch tickets', isLoading: false });
+        reject(err);
+      }
+    });
   },
 
   updateRegistrationStatus: async (eventId, userId, status) => {
