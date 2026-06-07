@@ -342,7 +342,8 @@ export default function EventChatScreen() {
 
       <KeyboardAvoidingView 
         style={styles.keyboardAvoid} 
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior="padding"
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 25}
       >
         <ImageBackground 
           source={require('../../assets/chat_bg.jpg')} 
