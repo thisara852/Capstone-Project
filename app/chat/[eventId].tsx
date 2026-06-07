@@ -345,7 +345,7 @@ export default function EventChatScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ImageBackground 
-          source={require('../../assets/chat_bg.png')} 
+          source={require('../../assets/chat_bg.jpg')} 
           style={styles.chatBackground}
           imageStyle={{ opacity: 0.6, resizeMode: 'cover' }}
         >
