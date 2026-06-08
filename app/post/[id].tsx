@@ -40,17 +40,18 @@ export default function PostDetailScreen() {
   }, [posts, adminEvents, myCompetitions, id]);
 
   const userId = user?.uid || 'demo-user';
-  const { isRegistered, currentRegistration, checkRegistrationStatus } = useRegistrationStore();
+  const { userTickets } = useRegistrationStore();
   const [showRegForm, setShowRegForm] = useState(false);
 
   const isLiked = post?.likes?.includes(userId) || false;
   const isSaved = profile?.savedPostIds?.includes(post?.id || '') || false;
 
-  useEffect(() => {
-    if (post && post.type === 'event' && user?.uid) {
-      checkRegistrationStatus(post.id, user.uid);
-    }
-  }, [post, user?.uid]);
+  const currentRegistration = useMemo(() => {
+    if (!post || post.type !== 'event') return null;
+    return userTickets.find(t => t.eventId === post.id) || null;
+  }, [userTickets, post]);
+
+  const isRegistered = !!currentRegistration;
 
   let regStatusMessage = 'Register for Event';
   let isRegActive = post?.registrationOpen !== false;
@@ -67,12 +68,6 @@ export default function PostDetailScreen() {
   } else if (post?.type === 'event' && !isRegActive) {
     regStatusMessage = 'Registration Closed';
   }
-
-  React.useEffect(() => {
-    if (post && post.type === 'event' && user?.uid) {
-      checkRegistrationStatus(post.id, user.uid);
-    }
-  }, [post, user?.uid]);
 
   const isCreatorOrganizer = post?.authorId === user?.uid;
   const isAdmin = profile?.role === 'admin';
