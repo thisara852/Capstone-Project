@@ -120,7 +120,15 @@ export const useRegistrationStore = create<RegistrationStore>()(
         ...extraData,
       };
 
-      await setDoc(regRef, registration);
+      const cleanedRegistration = Object.keys(registration).reduce((acc, key) => {
+        const val = registration[key as keyof Registration];
+        if (val !== undefined) {
+          acc[key] = val;
+        }
+        return acc;
+      }, {} as any);
+
+      await setDoc(regRef, cleanedRegistration);
       
       // Increment registeredCount on the event document
       const eventRef = doc(db, 'posts', eventId);

@@ -197,14 +197,17 @@ export const EventRegistrationForm: React.FC<EventRegistrationFormProps> = ({
         };
       }
 
-      const registrationDataPayload = {
+      const registrationDataPayload: any = {
         eventId,
         userId: profile?.uid || '',
         ...formData,
         registrationData: customAnswers,
-        uploadedFiles: Object.keys(uploadedFiles).length > 0 ? uploadedFiles : undefined,
         registrationStatus: 'pending' as const, // Always pending by default
       };
+
+      if (Object.keys(uploadedFiles).length > 0) {
+        registrationDataPayload.uploadedFiles = uploadedFiles;
+      }
 
       await registerForEvent(eventId, registrationDataPayload);
       
