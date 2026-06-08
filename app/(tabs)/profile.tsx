@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,20 +10,20 @@ import {
   Alert,
   TouchableOpacity,
   StyleSheet,
+  ActivityIndicator,
 } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { format } from 'date-fns';
 import { useUserStore } from '../../store/userStore';
-import { useFeedStore } from '../../store/feedStore';
 import { useRegistrationStore } from '../../store/registrationStore';
 import { useGroupStore } from '../../store/groupStore';
 import { Colors, Spacing, BorderRadius, FontSize, FontWeight } from '../../constants/theme';
 
 export default function ProfileScreen() {
-  const { profile, user, logout } = useUserStore();
-  const { posts } = useFeedStore();
+  const { profile, user, logout, savedPosts, isFetchingSavedPosts, fetchSavedPosts, toggleSavePost } = useUserStore();
   const { userTickets } = useRegistrationStore();
   const { groups } = useGroupStore();
   const [showInterests, setShowInterests] = useState(false);
@@ -39,7 +39,11 @@ export default function ProfileScreen() {
   // Calculate real stats
   const eventCount = userTickets?.length || 0;
   const groupCount = profile?.joinedGroups?.length || 0;
-  const postCount = posts.filter(p => p.authorId === user?.uid).length;
+
+  // Fetch saved posts from Firestore whenever savedPostIds changes
+  useEffect(() => {
+    fetchSavedPosts();
+  }, [profile?.savedPostIds?.length]);
 
   const handleLogout = () => {
     Alert.alert(
@@ -47,9 +51,9 @@ export default function ProfileScreen() {
       'Are you sure you want to sign out?',
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Sign Out', 
-          style: 'destructive', 
+        {
+          text: 'Sign Out',
+          style: 'destructive',
           onPress: async () => {
             await logout();
             router.replace('/(auth)/login');
@@ -64,7 +68,7 @@ export default function ProfileScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.container}>
         {/* Profile Header */}
         <LinearGradient
-          colors={['#1A2035', Colors.bgDark]}
+          colors={[Colors.bgCardAlt, Colors.bgDark]}
           style={styles.profileHeader}
         >
           <View style={styles.avatarContainer}>
@@ -75,7 +79,7 @@ export default function ProfileScreen() {
                 <Text style={styles.avatarText}>{displayName ? displayName[0].toUpperCase() : 'U'}</Text>
               </LinearGradient>
             )}
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.editAvatarBtn}
               onPress={() => router.push('/(settings)/edit-profile')}
             >
@@ -85,26 +89,26 @@ export default function ProfileScreen() {
           <Text style={styles.displayName}>{displayName}</Text>
           <Text style={styles.email}>{email}</Text>
           <View style={[
-            styles.memberBadge, 
+            styles.memberBadge,
             profile?.role === 'admin' && { backgroundColor: Colors.error + '22', borderColor: Colors.error },
             profile?.role === 'organizer' && { backgroundColor: Colors.primary + '22', borderColor: Colors.primary }
           ]}>
-            <Ionicons 
-              name={profile?.role === 'admin' ? 'shield' : profile?.role === 'organizer' ? 'star' : 'ribbon'} 
-              size={14} 
-              color={profile?.role === 'admin' ? Colors.error : profile?.role === 'organizer' ? Colors.primary : Colors.accentGold} 
+            <Ionicons
+              name={profile?.role === 'admin' ? 'shield' : profile?.role === 'organizer' ? 'star' : 'ribbon'}
+              size={14}
+              color={profile?.role === 'admin' ? Colors.error : profile?.role === 'organizer' ? Colors.primary : Colors.accentGold}
             />
             <Text style={[
               styles.memberBadgeText,
               profile?.role === 'admin' && { color: Colors.error },
               profile?.role === 'organizer' && { color: Colors.primary }
             ]}>
-              {profile?.role === 'admin' ? 'Administrator' : 
-               profile?.role === 'organizer' ? 'Organizer' : 
-               `IEEE ${memberType} Member`}
+              {profile?.role === 'admin' ? 'Administrator' :
+                profile?.role === 'organizer' ? 'Organizer' :
+                  `IEEE ${memberType} Member`}
             </Text>
           </View>
-          
+
           {profile?.bio && (
             <Text style={styles.bioText}>{profile.bio}</Text>
           )}
@@ -116,25 +120,11 @@ export default function ProfileScreen() {
           )}
         </LinearGradient>
 
-        {/* Stats Row */}
-        <View style={styles.statsRow}>
-          {[
-            { label: 'Events', value: eventCount.toString() },
-            { label: 'Groups', value: groupCount.toString() },
-            { label: 'Posts', value: postCount.toString() },
-          ].map((stat) => (
-            <View key={stat.label} style={styles.stat}>
-              <Text style={styles.statValue}>{stat.value}</Text>
-              <Text style={styles.statLabel}>{stat.label}</Text>
-            </View>
-          ))}
-        </View>
-
         {/* Branch Info */}
         {branch ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>IEEE Branch</Text>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.card}
               onPress={() => router.push('/branch/' + branch)}
             >
@@ -170,7 +160,7 @@ export default function ProfileScreen() {
                 ) : (
                   <Text style={{ color: Colors.textMuted, fontSize: FontSize.sm, marginRight: Spacing.md }}>No interests added yet.</Text>
                 )}
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.addInterestChip}
                   onPress={() => router.push('/(settings)/edit-profile')}
                 >
@@ -182,86 +172,99 @@ export default function ProfileScreen() {
           </View>
         )}
 
-        {/* Saved Posts */}
-        {profile?.savedPostIds && profile.savedPostIds.length > 0 && (
-          <View style={styles.section}>
+        {/* Saved Bookmarks */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Saved Bookmarks</Text>
-            {profile.savedPostIds.map((postId) => {
-              const post = posts.find((p) => p.id === postId);
-              if (!post) return null;
-              return (
-                <TouchableOpacity 
-                  key={postId} 
-                  style={styles.menuItem} 
-                  onPress={() => router.push(`/post/${postId}`)}
-                >
-                  <View style={[styles.menuIcon, { backgroundColor: Colors.accentGold + '22' }]}>
-                    <Ionicons name="bookmark" size={18} color={Colors.accentGold} />
-                  </View>
-                  <View style={{ flex: 1, paddingRight: 8 }}>
-                    <Text style={styles.menuLabel} numberOfLines={1}>{post.title}</Text>
-                    <Text style={{ color: Colors.textMuted, fontSize: FontSize.xs, marginTop: 2 }}>{post.author}</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
-                </TouchableOpacity>
-              );
-            })}
+            {savedPosts.length > 0 && (
+              <Text style={styles.savedCount}>{savedPosts.length} saved</Text>
+            )}
           </View>
-        )}
+
+          {isFetchingSavedPosts ? (
+            <View style={styles.savedLoadingRow}>
+              <ActivityIndicator size="small" color={Colors.primary} />
+              <Text style={styles.savedLoadingText}>Loading saved posts…</Text>
+            </View>
+          ) : savedPosts.length === 0 ? (
+            <View style={styles.savedEmpty}>
+              <Ionicons name="bookmark-outline" size={40} color={Colors.border} />
+              <Text style={styles.savedEmptyText}>No saved posts yet</Text>
+              <Text style={styles.savedEmptySubtext}>Tap the bookmark icon on any post to save it here</Text>
+            </View>
+          ) : (
+            savedPosts.map((post) => (
+              <TouchableOpacity
+                key={post.id}
+                style={styles.savedCard}
+                onPress={() => router.push(
+                  post.type === 'article' ? `/article/${post.id}` : `/post/${post.id}`
+                )}
+                activeOpacity={0.85}
+              >
+                {/* Thumbnail */}
+                {post.imageUrl ? (
+                  <Image
+                    source={{ uri: post.imageUrl }}
+                    style={styles.savedThumbnail}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View style={[styles.savedThumbnail, styles.savedThumbnailFallback]}>
+                    <Ionicons
+                      name={post.type === 'event' ? 'calendar' : post.type === 'article' ? 'newspaper' : 'megaphone'}
+                      size={22}
+                      color={Colors.primary}
+                    />
+                  </View>
+                )}
+
+                {/* Content */}
+                <View style={styles.savedCardContent}>
+                  {/* Type badge */}
+                  <View style={[styles.savedTypeBadge, {
+                    backgroundColor:
+                      post.type === 'event' ? Colors.accentGold + '22' :
+                        post.type === 'article' ? Colors.primary + '22' :
+                          Colors.success + '22',
+                  }]}>
+                    <Text style={[styles.savedTypeText, {
+                      color:
+                        post.type === 'event' ? Colors.accentGold :
+                          post.type === 'article' ? Colors.primary :
+                            Colors.success,
+                    }]}>
+                      {post.type.toUpperCase()}
+                    </Text>
+                  </View>
+
+                  <Text style={styles.savedTitle} numberOfLines={2}>{post.title}</Text>
+                  <Text style={styles.savedMeta}>
+                    {post.author} • {format(new Date(post.createdAt), 'MMM dd, yyyy')}
+                  </Text>
+                </View>
+
+                {/* Unsave button */}
+                <TouchableOpacity
+                  style={styles.unsaveBtn}
+                  onPress={() => toggleSavePost(post.id)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons name="bookmark" size={18} color={Colors.primary} />
+                </TouchableOpacity>
+              </TouchableOpacity>
+            ))
+          )}
+        </View>
 
         {/* Achievements */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Achievements</Text>
-          <View style={styles.badgesRow}>
-            {[
-              { 
-                icon: '⚡', 
-                title: 'Early Adopter', 
-                desc: 'Joined on launch', 
-                unlocked: profile?.createdAt ? true : false, 
-                progress: profile?.createdAt ? '1/1' : '0/1' 
-              },
-              { 
-                icon: '🏆', 
-                title: 'Event Champion', 
-                desc: 'Registered for 5+ events', 
-                unlocked: eventCount >= 5, 
-                progress: `${Math.min(eventCount, 5)}/5` 
-              },
-              { 
-                icon: '🤝', 
-                title: 'Team Player', 
-                desc: 'Member of 3+ groups', 
-                unlocked: groupCount >= 3, 
-                progress: `${Math.min(groupCount, 3)}/3` 
-              },
-              { 
-                icon: '✍️', 
-                title: 'Thought Leader', 
-                desc: 'Created a post', 
-                unlocked: postCount >= 1, 
-                progress: `${Math.min(postCount, 1)}/1` 
-              },
-            ].map((badge) => (
-              <TouchableOpacity 
-                key={badge.title} 
-                style={[styles.badge, !badge.unlocked && { opacity: 0.4 }]}
-                onPress={() => setSelectedBadge(badge)}
-              >
-                <Text style={styles.badgeIcon}>{badge.unlocked ? badge.icon : '🔒'}</Text>
-                <Text style={styles.badgeTitle}>{badge.title}</Text>
-                <Text style={styles.badgeDesc}>{badge.desc}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
 
         {/* Organizer Tools */}
         {profile?.role === 'organizer' && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Organizer Tools</Text>
-            <TouchableOpacity 
-              style={[styles.menuItem, { borderColor: Colors.primary }]} 
+            <TouchableOpacity
+              style={[styles.menuItem, { borderColor: Colors.primary }]}
               onPress={() => router.replace('/(organizer)/dashboard')}
             >
               <View style={[styles.menuIcon, { backgroundColor: Colors.primary }]}>
@@ -277,8 +280,8 @@ export default function ProfileScreen() {
         {profile?.role === 'admin' && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Admin Tools</Text>
-            <TouchableOpacity 
-              style={[styles.menuItem, { borderColor: Colors.error }]} 
+            <TouchableOpacity
+              style={[styles.menuItem, { borderColor: Colors.error }]}
               onPress={() => router.replace('/(admin)/dashboard')}
             >
               <View style={[styles.menuIcon, { backgroundColor: Colors.error }]}>
@@ -288,8 +291,8 @@ export default function ProfileScreen() {
               <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
             </TouchableOpacity>
 
-            <TouchableOpacity 
-              style={[styles.menuItem, { marginTop: Spacing.sm }]} 
+            <TouchableOpacity
+              style={[styles.menuItem, { marginTop: Spacing.sm }]}
               onPress={() => router.push('/(admin)/support-inbox')}
             >
               <View style={[styles.menuIcon, { backgroundColor: 'rgba(59, 130, 246, 0.1)' }]}>
@@ -305,25 +308,25 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Account</Text>
           {[
-            { 
-              icon: 'person-outline', 
-              label: 'Edit Profile', 
-              action: () => router.push('/(settings)/edit-profile') 
+            {
+              icon: 'person-outline',
+              label: 'Edit Profile',
+              action: () => router.push('/(settings)/edit-profile')
             },
-            { 
-              icon: 'shield-outline', 
-              label: 'Privacy & Security', 
-              action: () => router.push('/(settings)/privacy') 
+            {
+              icon: 'shield-outline',
+              label: 'Privacy & Security',
+              action: () => router.push('/(settings)/privacy')
             },
-            { 
-              icon: 'notifications-outline', 
-              label: 'Notifications', 
-              action: () => router.push('/(tabs)/notifications') 
+            {
+              icon: 'notifications-outline',
+              label: 'Notifications',
+              action: () => router.push('/(tabs)/notifications')
             },
-            { 
-              icon: 'help-circle-outline', 
-              label: 'Help & Support', 
-              action: () => router.push('/(settings)/support') 
+            {
+              icon: 'help-circle-outline',
+              label: 'Help & Support',
+              action: () => router.push('/(settings)/support')
             },
           ].map((item) => (
             <TouchableOpacity key={item.label} style={styles.menuItem} onPress={item.action}>
@@ -351,7 +354,7 @@ export default function ProfileScreen() {
         onRequestClose={() => setSelectedBadge(null)}
         statusBarTranslucent
       >
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{flex: 1}}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
           <View style={styles.modalOverlay}>
             <LinearGradient colors={[Colors.bgCard, '#1A1F30']} style={styles.modalContent}>
               {selectedBadge && (
@@ -361,12 +364,12 @@ export default function ProfileScreen() {
                   </View>
                   <Text style={styles.modalTitle}>{selectedBadge.title}</Text>
                   <Text style={styles.modalDescription}>{selectedBadge.desc}</Text>
-                  
+
                   <View style={styles.progressContainer}>
                     <Text style={styles.progressLabel}>Current Progress</Text>
                     <Text style={styles.progressValue}>{selectedBadge.progress}</Text>
                   </View>
-                  
+
                   {!selectedBadge.unlocked && (
                     <View style={styles.lockedContainer}>
                       <Ionicons name="lock-closed" size={16} color={Colors.warning} />
@@ -374,7 +377,7 @@ export default function ProfileScreen() {
                     </View>
                   )}
 
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={styles.modalCloseBtn}
                     onPress={() => setSelectedBadge(null)}
                   >
@@ -433,9 +436,35 @@ const styles = StyleSheet.create({
   logoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginHorizontal: Spacing.lg, paddingVertical: 16, backgroundColor: Colors.error + '11', borderRadius: BorderRadius.md, gap: 8, borderWidth: 1, borderColor: Colors.error + '44' },
   logoutText: { color: Colors.error, fontSize: FontSize.md, fontWeight: 'bold' },
 
+  // ── Saved Posts ─────────────────────────────────────────────
+  savedCount: { fontSize: FontSize.xs, color: Colors.primary, fontWeight: FontWeight.semiBold, backgroundColor: Colors.primary + '15', paddingHorizontal: 8, paddingVertical: 3, borderRadius: BorderRadius.full },
+  savedLoadingRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: Spacing.lg },
+  savedLoadingText: { color: Colors.textMuted, fontSize: FontSize.sm },
+  savedEmpty: { alignItems: 'center', paddingVertical: Spacing.xxl, gap: Spacing.sm, backgroundColor: Colors.bgCard, borderRadius: BorderRadius.lg, borderWidth: 1, borderColor: Colors.border },
+  savedEmptyText: { color: Colors.textPrimary, fontSize: FontSize.md, fontWeight: FontWeight.semiBold },
+  savedEmptySubtext: { color: Colors.textMuted, fontSize: FontSize.sm, textAlign: 'center', maxWidth: 220 },
+  savedCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.bgCard,
+    borderRadius: BorderRadius.lg,
+    marginBottom: Spacing.sm,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    overflow: 'hidden',
+  },
+  savedThumbnail: { width: 80, height: 80 },
+  savedThumbnailFallback: { backgroundColor: Colors.bgSurface, justifyContent: 'center', alignItems: 'center' },
+  savedCardContent: { flex: 1, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, gap: 4 },
+  savedTypeBadge: { alignSelf: 'flex-start', paddingHorizontal: 7, paddingVertical: 2, borderRadius: BorderRadius.full },
+  savedTypeText: { fontSize: FontSize.xs, fontWeight: FontWeight.bold },
+  savedTitle: { color: Colors.textPrimary, fontSize: FontSize.sm, fontWeight: FontWeight.semiBold, lineHeight: 18 },
+  savedMeta: { color: Colors.textMuted, fontSize: FontSize.xs },
+  unsaveBtn: { padding: Spacing.md },
+
   // Modal Styles
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', padding: Spacing.xl },
-  modalContent: { width: '100%', borderRadius: BorderRadius.xl, padding: Spacing.xl, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', shadowColor: Colors.primary, shadowOffset: {width: 0, height: 10}, shadowOpacity: 0.3, shadowRadius: 20, elevation: 15 },
+  modalContent: { width: '100%', borderRadius: BorderRadius.xl, padding: Spacing.xl, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', shadowColor: Colors.primary, shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 15 },
   modalIconWrap: { width: 80, height: 80, borderRadius: 40, backgroundColor: Colors.primary + '15', justifyContent: 'center', alignItems: 'center', marginBottom: Spacing.md, borderWidth: 1, borderColor: Colors.primary + '30' },
   modalTitle: { fontSize: FontSize.xxl, fontWeight: FontWeight.extraBold, color: Colors.textPrimary, marginBottom: Spacing.xs, textAlign: 'center' },
   modalDescription: { fontSize: FontSize.md, color: Colors.textSecondary, textAlign: 'center', marginBottom: Spacing.lg },

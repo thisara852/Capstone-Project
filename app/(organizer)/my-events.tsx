@@ -112,12 +112,6 @@ export default function MyEventsScreen() {
           </View>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <TouchableOpacity 
-              style={[styles.iconButton, { backgroundColor: Colors.success + '15' }]}
-              onPress={() => router.push({ pathname: '/chat/[eventId]', params: { eventId: item.id } })}
-            >
-              <Ionicons name="chatbubbles" size={18} color={Colors.success} />
-            </TouchableOpacity>
-            <TouchableOpacity 
               style={[styles.iconButton, { backgroundColor: Colors.accent + '15' }]}
               onPress={() => router.push({ pathname: '/(organizer)/event/[id]/analytics', params: { id: item.id } })}
             >

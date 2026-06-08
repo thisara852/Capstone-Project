@@ -26,7 +26,7 @@ export default function CreateGroupScreen() {
   const { user, profile } = useUserStore();
   const { createGroup } = useGroupStore();
 
-  const isOrganizer = profile?.role === 'organizer' || profile?.role === 'admin';
+  const isOrganizer = profile?.role === 'organizer';
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');

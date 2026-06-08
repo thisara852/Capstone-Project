@@ -17,11 +17,17 @@ import {
   doc,
   setDoc,
   getDoc,
+  getDocs,
   updateDoc,
   onSnapshot,
   arrayUnion,
   arrayRemove,
+  collection,
+  query,
+  where,
+  documentId,
 } from 'firebase/firestore';
+import { Post } from './feedStore';
 import { useFeedStore } from './feedStore';
 import { useNotificationStore } from './notificationStore';
 import { useGroupStore } from './groupStore';
@@ -75,6 +81,8 @@ export interface UserProfile {
 interface UserStore {
   user: User | null;
   profile: UserProfile | null;
+  savedPosts: Post[];
+  isFetchingSavedPosts: boolean;
   isLoading: boolean;
   isInitializing: boolean;
   isFetchingProfile: boolean;
@@ -91,6 +99,7 @@ interface UserStore {
   updateUserPassword: (currentPass: string, newPass: string) => Promise<void>;
   deactivateUserAccount: (password: string) => Promise<void>;
   toggleSavePost: (postId: string) => Promise<void>;
+  fetchSavedPosts: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   initializeAuth: () => void;
   clearError: () => void;
@@ -101,6 +110,8 @@ export const useUserStore = create<UserStore>()(
     (set, get) => ({
       user: null,
       profile: null,
+      savedPosts: [],
+      isFetchingSavedPosts: false,
       isLoading: true,
       isInitializing: true,
       isFetchingProfile: false,
@@ -382,6 +393,53 @@ export const useUserStore = create<UserStore>()(
     }
   },
 
+  fetchSavedPosts: async () => {
+    const { profile } = get();
+    const savedPostIds = profile?.savedPostIds || [];
+    if (savedPostIds.length === 0) {
+      set({ savedPosts: [] });
+      return;
+    }
+
+    set({ isFetchingSavedPosts: true });
+    try {
+      // Firestore 'in' queries support up to 30 items at a time
+      const chunks: string[][] = [];
+      for (let i = 0; i < savedPostIds.length; i += 30) {
+        chunks.push(savedPostIds.slice(i, i + 30));
+      }
+
+      const allPosts: Post[] = [];
+      for (const chunk of chunks) {
+        const q = query(
+          collection(db, 'posts'),
+          where(documentId(), 'in', chunk)
+        );
+        const snap = await getDocs(q);
+        snap.docs.forEach(d => {
+          const data = d.data();
+          allPosts.push({
+            id: d.id,
+            ...data,
+            createdAt: data.createdAt?.toMillis ? data.createdAt.toMillis() : data.createdAt,
+            eventDate: data.eventDate?.toMillis ? data.eventDate.toMillis() : data.eventDate,
+          } as Post);
+        });
+      }
+
+      // Preserve original save order
+      const ordered = savedPostIds
+        .map(id => allPosts.find(p => p.id === id))
+        .filter(Boolean) as Post[];
+
+      set({ savedPosts: ordered });
+    } catch (err) {
+      console.error('Failed to fetch saved posts:', err);
+    } finally {
+      set({ isFetchingSavedPosts: false });
+    }
+  },
+
   resetPassword: async (email) => {
     set({ isLoading: true, error: null });
     try {
@@ -410,7 +468,7 @@ export const useUserStore = create<UserStore>()(
     {
       name: 'user-storage',
       storage: createJSONStorage(() => AsyncStorage),
-      partialize: (state) => ({ profile: state.profile }),
+      partialize: (state) => ({ profile: state.profile, savedPosts: state.savedPosts }),
     }
   )
 );

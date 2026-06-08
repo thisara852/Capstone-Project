@@ -70,7 +70,7 @@ export default function BranchDetailScreen() {
 
         {/* Hero */}
         <LinearGradient
-          colors={['#1A2035', Colors.bgDark]}
+          colors={[Colors.bgCardAlt, Colors.bgDark]}
           style={styles.hero}
         >
           <View style={styles.branchAvatar}>

@@ -32,18 +32,18 @@ export default function FeedScreen() {
   const { unreadCount } = useNotificationStore();
   const [activeFilter, setActiveFilter] = useState('All');
   const [refreshing, setRefreshing] = useState(false);
-  
+
   const [upperHeaderHeight, setUpperHeaderHeight] = useState(100);
   const [filterHeightState, setFilterHeightState] = useState(60);
   const insets = useSafeAreaInsets();
-  
+
   const scrollY = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (!user?.uid) return;
-    
+
     fetchPosts(profile?.interests);
-    
+
     // Defer tickets fetch so it doesn't compete with the main feed listener
     const task = InteractionManager.runAfterInteractions(() => {
       fetchUserTickets(user.uid);
@@ -78,7 +78,7 @@ export default function FeedScreen() {
 
   // Interpolations for shrink animation
   const scrollDistance = Math.max(upperHeaderHeight - insets.top, 1);
-  
+
   const headerTranslateY = scrollY.interpolate({
     inputRange: [0, scrollDistance],
     outputRange: [0, -scrollDistance],
@@ -103,13 +103,13 @@ export default function FeedScreen() {
   return (
     <View style={styles.safe}>
       {/* Absolute Sticky Header Container */}
-      <Animated.View 
+      <Animated.View
         style={[
           styles.absoluteHeaderContainer,
           { transform: [{ translateY: headerTranslateY }] }
         ]}
       >
-        <View 
+        <View
           style={styles.upperHeaderContainer}
           onLayout={(e) => setUpperHeaderHeight(e.nativeEvent.layout.height)}
         >
@@ -117,12 +117,12 @@ export default function FeedScreen() {
           <Animated.View style={[styles.header, { opacity: headerOpacity, paddingTop: Math.max(insets.top, Spacing.sm) }]}>
             <View>
               <Text style={styles.greeting}>
-                Hey {profile?.displayName?.split(' ')[0] || 'Dewmi'} 👋
+                Hey {profile?.displayName?.split(' ')[0] || 'Dewmi'}
               </Text>
               <Text style={styles.headerTitle}>IEEE CompConnect</Text>
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.notifBtn}
                 onPress={() => router.push('/(tabs)/notifications')}
               >
@@ -146,7 +146,7 @@ export default function FeedScreen() {
         </View>
 
         {/* Filter Tabs (Sticky Section) */}
-        <View 
+        <View
           style={styles.filterSection}
           onLayout={(e) => setFilterHeightState(e.nativeEvent.layout.height)}
         >
@@ -198,11 +198,11 @@ export default function FeedScreen() {
         scrollEventThrottle={16}
         contentContainerStyle={[styles.listContent, { paddingTop: totalHeaderHeight + Spacing.sm }]}
         refreshControl={
-          <RefreshControl 
-            refreshing={refreshing} 
-            onRefresh={onRefresh} 
-            tintColor={Colors.primary} 
-            progressViewOffset={totalHeaderHeight} 
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={Colors.primary}
+            progressViewOffset={totalHeaderHeight}
           />
         }
         showsVerticalScrollIndicator={false}
@@ -233,7 +233,7 @@ export default function FeedScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.bgDark },
-  
+
   // Header Containers
   absoluteHeaderContainer: {
     position: 'absolute',
@@ -305,7 +305,7 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     fontSize: FontSize.sm,
   },
-  
+
   // Filter Tabs
   filterScroll: {
     paddingHorizontal: Spacing.md,
@@ -344,7 +344,7 @@ const styles = StyleSheet.create({
   filterTextActive: {
     color: '#fff',
   },
-  
+
   listContent: {
     paddingBottom: 100,
   },

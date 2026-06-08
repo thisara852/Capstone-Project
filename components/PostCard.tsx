@@ -81,6 +81,23 @@ export function PostCard({ post, onPress, onLike, isLiked }: PostCardProps) {
         </View>
       )}
 
+      {/* Author Row — shown right after image */}
+      <TouchableOpacity
+        style={styles.authorRow}
+        onPress={() => router.push(`/user/${post.authorId}`)}
+      >
+        <View style={styles.authorAvatar}>
+          <Text style={styles.authorInitial}>{post.author[0]}</Text>
+        </View>
+        <View>
+          <Text style={styles.authorName} numberOfLines={1}>{post.author}</Text>
+          <Text style={styles.timeAgo}>
+            {format(new Date(post.createdAt), 'MMM dd')}
+            {post.type === 'article' && post.readTime ? ` • ${post.readTime} min read` : ''}
+          </Text>
+        </View>
+      </TouchableOpacity>
+
       <View style={styles.content}>
         {/* Tags */}
         <View style={styles.tagsRow}>
@@ -126,24 +143,8 @@ export function PostCard({ post, onPress, onLike, isLiked }: PostCardProps) {
           </View>
         )}
 
-        {/* Footer */}
+        {/* Footer — actions only */}
         <View style={styles.footer}>
-          <TouchableOpacity 
-            style={styles.authorRow}
-            onPress={() => router.push(`/user/${post.authorId}`)}
-          >
-            <View style={styles.authorAvatar}>
-              <Text style={styles.authorInitial}>{post.author[0]}</Text>
-            </View>
-            <View>
-              <Text style={styles.authorName} numberOfLines={1}>{post.author}</Text>
-              <Text style={styles.timeAgo}>
-                {format(new Date(post.createdAt), 'MMM dd')}
-                {post.type === 'article' && post.readTime ? ` • ${post.readTime} min read` : ''}
-              </Text>
-            </View>
-          </TouchableOpacity>
-
           <View style={styles.actions}>
             <TouchableOpacity style={styles.actionBtn} onPress={onLike}>
               <Ionicons
@@ -341,15 +342,18 @@ const styles = StyleSheet.create({
   },
   footer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     alignItems: 'center',
     marginTop: 4,
   },
   authorRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    flex: 1,
+    gap: 10,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
   },
   authorAvatar: {
     width: 32,

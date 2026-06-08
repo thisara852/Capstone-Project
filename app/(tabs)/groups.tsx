@@ -60,7 +60,7 @@ export default function GroupsScreen() {
   const { user, profile } = useUserStore();
   const { userTickets } = useRegistrationStore();
   const { posts } = useFeedStore();
-  
+
   const [activeCategory, setActiveCategory] = useState('All');
   const [search, setSearch] = useState('');
   const [refreshing, setRefreshing] = useState(false);
@@ -102,7 +102,7 @@ export default function GroupsScreen() {
       return event ? { id: event.id, title: event.title, author: event.author, status: r.status, imageUrl: event.imageUrl } : null;
     })
     .filter(Boolean) as { id: string; title: string; author: string; status: string; imageUrl?: string }[];
-  
+
   const organizedEvents = posts
     .filter((p) => p.type === 'event' && p.authorId === userId)
     .map((event) => ({
@@ -125,7 +125,7 @@ export default function GroupsScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView 
+      <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />
@@ -134,17 +134,17 @@ export default function GroupsScreen() {
         {/* ── Header ───────────────────────────────────────────── */}
         <View style={styles.header}>
           <View style={{ flex: 1, paddingRight: 10 }}>
-            <Text style={styles.title} numberOfLines={1} adjustsFontSizeToFit>Communities</Text>
+            <Text style={styles.title} numberOfLines={1} adjustsFontSizeToFit>Chats</Text>
             <Text style={styles.subtitle}>Chats & Circles</Text>
           </View>
           <View style={{ flexDirection: 'row', gap: 8 }}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[styles.createBtn, { backgroundColor: Colors.bgCard, borderWidth: 1, borderColor: Colors.border }]}
               onPress={() => setIsJoinModalVisible(true)}
             >
               <Ionicons name="link" size={20} color={Colors.primary} />
             </TouchableOpacity>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.createBtn}
               onPress={() => router.push('/create-group')}
             >
@@ -304,7 +304,7 @@ export default function GroupsScreen() {
               const avatarColor = getAvatarColor(group.name);
               return (
                 <View key={group.id} style={styles.recommendCard}>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={[styles.recommendAvatar, { backgroundColor: avatarColor }]}
                     onPress={() => router.push(`/group/${group.id}`)}
                   >
@@ -356,9 +356,9 @@ export default function GroupsScreen() {
 
       {/* ── Premium Join Modal ─────────────────────────────── */}
       <Modal visible={isJoinModalVisible} transparent={true} animationType="fade" statusBarTranslucent>
-        <KeyboardAvoidingView 
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined} 
-          style={{flex: 1}}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={{ flex: 1 }}
         >
           <View style={styles.modalOverlay}>
             <LinearGradient
@@ -370,7 +370,7 @@ export default function GroupsScreen() {
               </View>
               <Text style={styles.modalTitle}>Join Community</Text>
               <Text style={styles.modalSubtitle}>Paste your secure invite link or community ID below.</Text>
-              
+
               <TextInput
                 style={styles.modalInput}
                 placeholder="ieeecompconnect://group/abc..."
@@ -382,7 +382,7 @@ export default function GroupsScreen() {
               />
 
               <View style={styles.modalActions}>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.modalCancelBtn}
                   onPress={() => {
                     setIsJoinModalVisible(false);
@@ -391,7 +391,7 @@ export default function GroupsScreen() {
                 >
                   <Text style={styles.modalCancelText}>Cancel</Text>
                 </TouchableOpacity>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={[styles.modalJoinBtn, !joinLinkText.trim() && { opacity: 0.5 }]}
                   disabled={!joinLinkText.trim()}
                   onPress={() => {
@@ -427,7 +427,7 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: FontSize.xxxl, fontWeight: FontWeight.extraBold, color: Colors.textPrimary },
   subtitle: { color: Colors.textSecondary, fontSize: FontSize.sm, marginTop: 2 },
-  
+
   createBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -577,7 +577,7 @@ const styles = StyleSheet.create({
 
   // ── Modal Styles ───────────────────────────────────
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', padding: Spacing.xl },
-  modalContent: { width: '100%', borderRadius: BorderRadius.xl, padding: Spacing.xl, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', shadowColor: Colors.primary, shadowOffset: {width: 0, height: 10}, shadowOpacity: 0.3, shadowRadius: 20, elevation: 15 },
+  modalContent: { width: '100%', borderRadius: BorderRadius.xl, padding: Spacing.xl, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', shadowColor: Colors.primary, shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 15 },
   modalIconWrap: { width: 70, height: 70, borderRadius: 35, backgroundColor: Colors.primary + '15', justifyContent: 'center', alignItems: 'center', marginBottom: Spacing.md, borderWidth: 1, borderColor: Colors.primary + '30' },
   modalTitle: { fontSize: FontSize.xxl, fontWeight: FontWeight.extraBold, color: Colors.textPrimary, marginBottom: Spacing.xs },
   modalSubtitle: { fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center', marginBottom: Spacing.xl, lineHeight: 20 },
@@ -585,7 +585,7 @@ const styles = StyleSheet.create({
   modalActions: { flexDirection: 'row', gap: Spacing.md, width: '100%' },
   modalCancelBtn: { flex: 1, paddingVertical: 14, borderRadius: BorderRadius.full, backgroundColor: 'transparent', alignItems: 'center', borderWidth: 1, borderColor: Colors.border },
   modalCancelText: { color: Colors.textPrimary, fontSize: FontSize.md, fontWeight: 'bold' },
-  modalJoinBtn: { flex: 1, paddingVertical: 14, borderRadius: BorderRadius.full, backgroundColor: Colors.primary, alignItems: 'center', shadowColor: Colors.primary, shadowOffset: {width: 0, height: 4}, shadowOpacity: 0.4, shadowRadius: 8, elevation: 5 },
+  modalJoinBtn: { flex: 1, paddingVertical: 14, borderRadius: BorderRadius.full, backgroundColor: Colors.primary, alignItems: 'center', shadowColor: Colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 5 },
   modalJoinText: { color: '#fff', fontSize: FontSize.md, fontWeight: 'bold' },
 
   // ── Recommendation card ───────────────────────────────────────

@@ -11,6 +11,7 @@ import {
   Platform,
   Alert,
   Modal,
+  Image,
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
@@ -52,7 +53,7 @@ export default function LoginScreen() {
     }
     clearError();
     await login(email.trim(), password);
-    
+
     // Navigate immediately if login succeeded (no error was set)
     const { error: loginError } = useUserStore.getState();
     if (!loginError) {
@@ -68,7 +69,7 @@ export default function LoginScreen() {
 
     await resetPassword(resetEmail.trim());
     const { error: resetError } = useUserStore.getState();
-    
+
     if (!resetError) {
       setShowForgotModal(false);
       setResetEmail('');
@@ -92,19 +93,18 @@ export default function LoginScreen() {
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <ScrollView 
+        <ScrollView
           contentContainerStyle={styles.container}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
           {/* Header */}
           <View style={styles.header}>
-            <LinearGradient
-              colors={Colors.gradientPrimary as [string, string]}
-              style={styles.logoContainer}
-            >
-              <Text style={styles.logoText}>⚡</Text>
-            </LinearGradient>
+            <Image
+              source={require('../../assets/ieee_logo.png')}
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
             <Text style={styles.appName}>IEEE CompConnect</Text>
             <Text style={styles.subtitle}>Your IEEE Community Hub</Text>
           </View>
@@ -155,7 +155,7 @@ export default function LoginScreen() {
               </View>
             </View>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.forgotBtn}
               onPress={() => setShowForgotModal(true)}
             >
@@ -204,7 +204,7 @@ export default function LoginScreen() {
         onRequestClose={handleCloseForgotModal}
         statusBarTranslucent
       >
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{flex: 1}}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
           <View style={styles.modalOverlay}>
             <LinearGradient colors={[Colors.bgCard, '#1A1F30']} style={styles.modalContent}>
               <View style={styles.modalIconWrap}>
@@ -212,57 +212,57 @@ export default function LoginScreen() {
               </View>
               <Text style={styles.modalTitle}>Reset Password</Text>
 
-            <Text style={styles.modalDescription}>
-              Enter your email address and we'll send you a link to reset your password.
-            </Text>
+              <Text style={styles.modalDescription}>
+                Enter your email address and we'll send you a link to reset your password.
+              </Text>
 
-            {error && (
-              <View style={styles.errorBox}>
-                <Ionicons name="alert-circle" size={16} color={Colors.error} />
-                <Text style={styles.errorText}>{error}</Text>
+              {error && (
+                <View style={styles.errorBox}>
+                  <Ionicons name="alert-circle" size={16} color={Colors.error} />
+                  <Text style={styles.errorText}>{error}</Text>
+                </View>
+              )}
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Email Address</Text>
+                <View style={styles.inputWrapper}>
+                  <Ionicons name="mail-outline" size={18} color={Colors.textMuted} style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="your@ieee.org"
+                    placeholderTextColor={Colors.textMuted}
+                    value={resetEmail}
+                    onChangeText={setResetEmail}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    editable={!resetLoading}
+                  />
+                </View>
               </View>
-            )}
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Email Address</Text>
-              <View style={styles.inputWrapper}>
-                <Ionicons name="mail-outline" size={18} color={Colors.textMuted} style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="your@ieee.org"
-                  placeholderTextColor={Colors.textMuted}
-                  value={resetEmail}
-                  onChangeText={setResetEmail}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  editable={!resetLoading}
-                />
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={styles.modalCancelBtn}
+                  onPress={handleCloseForgotModal}
+                  disabled={resetLoading}
+                >
+                  <Text style={styles.modalCancelText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.modalSubmitBtn}
+                  onPress={handleForgotPassword}
+                  disabled={resetLoading}
+                >
+                  {resetLoading ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.modalSubmitText}>Send Reset Link</Text>
+                  )}
+                </TouchableOpacity>
               </View>
-            </View>
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity 
-                style={styles.modalCancelBtn}
-                onPress={handleCloseForgotModal}
-                disabled={resetLoading}
-              >
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={styles.modalSubmitBtn}
-                onPress={handleForgotPassword}
-                disabled={resetLoading}
-              >
-                {resetLoading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.modalSubmitText}>Send Reset Link</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </LinearGradient>
-        </View>
+            </LinearGradient>
+          </View>
         </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
@@ -285,16 +285,10 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.lg,
     gap: Spacing.sm,
   },
-  logoContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  logoText: {
-    fontSize: 36,
+  logoImage: {
+    width: 160,
+    height: 90,
+    marginBottom: Spacing.xs,
   },
   appName: {
     fontSize: FontSize.xxl,
@@ -430,13 +424,13 @@ const styles = StyleSheet.create({
   },
   // Modal Styles
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', padding: Spacing.xl },
-  modalContent: { width: '100%', borderRadius: BorderRadius.xl, padding: Spacing.xl, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', shadowColor: Colors.primary, shadowOffset: {width: 0, height: 10}, shadowOpacity: 0.3, shadowRadius: 20, elevation: 15 },
+  modalContent: { width: '100%', borderRadius: BorderRadius.xl, padding: Spacing.xl, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', shadowColor: Colors.primary, shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 15 },
   modalIconWrap: { width: 70, height: 70, borderRadius: 35, backgroundColor: Colors.primary + '15', justifyContent: 'center', alignItems: 'center', marginBottom: Spacing.md, borderWidth: 1, borderColor: Colors.primary + '30' },
   modalTitle: { fontSize: FontSize.xxl, fontWeight: FontWeight.extraBold, color: Colors.textPrimary, marginBottom: Spacing.xs },
   modalDescription: { fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center', marginBottom: Spacing.xl, lineHeight: 20 },
   modalActions: { flexDirection: 'row', gap: Spacing.md, width: '100%', marginTop: 10 },
   modalCancelBtn: { flex: 1, paddingVertical: 14, borderRadius: BorderRadius.full, backgroundColor: 'transparent', alignItems: 'center', borderWidth: 1, borderColor: Colors.border },
   modalCancelText: { color: Colors.textPrimary, fontSize: FontSize.md, fontWeight: 'bold' },
-  modalSubmitBtn: { flex: 1, paddingVertical: 14, borderRadius: BorderRadius.full, backgroundColor: Colors.primary, alignItems: 'center', shadowColor: Colors.primary, shadowOffset: {width: 0, height: 4}, shadowOpacity: 0.4, shadowRadius: 8, elevation: 5, justifyContent: 'center' },
+  modalSubmitBtn: { flex: 1, paddingVertical: 14, borderRadius: BorderRadius.full, backgroundColor: Colors.primary, alignItems: 'center', shadowColor: Colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 5, justifyContent: 'center' },
   modalSubmitText: { color: '#fff', fontSize: FontSize.md, fontWeight: 'bold' },
 });

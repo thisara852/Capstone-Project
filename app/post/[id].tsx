@@ -32,17 +32,17 @@ export default function PostDetailScreen() {
   const { events: adminEvents } = useAdminStore();
   const { myCompetitions } = useCompetitionStore();
   const { user, profile } = useUserStore();
-  
+
   const post = useMemo(() => {
-    return posts.find((p) => p.id === id) || 
-           adminEvents.find((p) => p.id === id) ||
-           myCompetitions.find((p) => p.id === id);
+    return posts.find((p) => p.id === id) ||
+      adminEvents.find((p) => p.id === id) ||
+      myCompetitions.find((p) => p.id === id);
   }, [posts, adminEvents, myCompetitions, id]);
-  
+
   const userId = user?.uid || 'demo-user';
   const { isRegistered, currentRegistration, checkRegistrationStatus } = useRegistrationStore();
   const [showRegForm, setShowRegForm] = useState(false);
-  
+
   const isLiked = post?.likes?.includes(userId) || false;
   const isSaved = profile?.savedPostIds?.includes(post?.id || '') || false;
 
@@ -105,12 +105,12 @@ export default function PostDetailScreen() {
         {post.imageUrl ? (
           <View style={styles.imageContainer}>
             {/* Main Contained Image (No Cropping) */}
-            <Image 
-              source={{ uri: getOptimizedImageUrl(post.imageUrl) }} 
-              style={styles.image} 
-              resizeMode="contain" 
+            <Image
+              source={{ uri: getOptimizedImageUrl(post.imageUrl) }}
+              style={styles.image}
+              resizeMode="contain"
             />
-            
+
             <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
               <Ionicons name="arrow-back" size={22} color="#fff" />
             </TouchableOpacity>
@@ -150,7 +150,7 @@ export default function PostDetailScreen() {
           {/* Event Details */}
           {post.type === 'event' && (
             <View style={styles.eventBox}>
-              <Text style={styles.eventBoxTitle}>📅 Event Details</Text>
+              <Text style={styles.eventBoxTitle}>Event Details</Text>
               {post.eventDate && (
                 <View style={styles.eventDetail}>
                   <Ionicons name="calendar" size={16} color={Colors.accentGold} />
@@ -216,7 +216,7 @@ export default function PostDetailScreen() {
               <Ionicons name="chatbubble-outline" size={20} color={Colors.textSecondary} />
               <Text style={styles.actionLabel}>{post.comments || 0} Comments</Text>
             </TouchableOpacity>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.actionBtn}
               onPress={async () => {
                 console.log('Share clicked');
@@ -238,7 +238,7 @@ export default function PostDetailScreen() {
 
           {/* Join Chat Button (if authorized) */}
           {canAccessChat && (
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.chatBtn}
               onPress={() => router.push(`/chat/${post.id}`)}
             >
@@ -256,16 +256,16 @@ export default function PostDetailScreen() {
         <View style={styles.bottomCTA}>
           {isRegistered ? (
             <View style={[
-              styles.registerBtn, 
+              styles.registerBtn,
               { backgroundColor: currentRegistration?.status === 'pending' ? Colors.warning + '22' : Colors.success + '22' }
             ]}>
-              <Ionicons 
-                name={currentRegistration?.status === 'pending' ? 'time' : 'checkmark-circle'} 
-                size={20} 
-                color={currentRegistration?.status === 'pending' ? Colors.warning : Colors.success} 
+              <Ionicons
+                name={currentRegistration?.status === 'pending' ? 'time' : 'checkmark-circle'}
+                size={20}
+                color={currentRegistration?.status === 'pending' ? Colors.warning : Colors.success}
               />
               <Text style={[
-                styles.registerText, 
+                styles.registerText,
                 { color: currentRegistration?.status === 'pending' ? Colors.warning : Colors.success }
               ]}>
                 {currentRegistration?.status === 'pending' ? 'Pending Approval' : 'Registered'}
@@ -273,29 +273,29 @@ export default function PostDetailScreen() {
             </View>
           ) : (
             <View style={{ gap: Spacing.md }}>
-              <TouchableOpacity 
-                style={[styles.registerBtn, (!isRegActive) && { opacity: 0.6 }]} 
+              <TouchableOpacity
+                style={[styles.registerBtn, (!isRegActive) && { opacity: 0.6 }]}
                 onPress={handleRegisterClick}
                 disabled={!isRegActive}
               >
-              <LinearGradient
-                colors={Colors.gradientPrimary as [string, string]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.registerGradient}
-              >
-                <Text style={styles.registerText}>
-                  {regStatusMessage}
-                </Text>
-              </LinearGradient>
-            </TouchableOpacity>
+                <LinearGradient
+                  colors={Colors.gradientPrimary as [string, string]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.registerGradient}
+                >
+                  <Text style={styles.registerText}>
+                    {regStatusMessage}
+                  </Text>
+                </LinearGradient>
+              </TouchableOpacity>
             </View>
           )}
         </View>
       )}
 
       {post && (
-        <EventRegistrationForm 
+        <EventRegistrationForm
           eventId={post.id}
           registrationConfig={post.registrationConfig}
           visible={showRegForm}
@@ -308,17 +308,17 @@ export default function PostDetailScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.bgDark },
-  imageContainer: { 
-    width: '100%', 
-    aspectRatio: 16 / 9, 
-    position: 'relative', 
+  imageContainer: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    position: 'relative',
     backgroundColor: Colors.bgDark,
     alignItems: 'center',
     justifyContent: 'center'
   },
-  image: { 
-    width: '100%', 
-    height: '100%', 
+  image: {
+    width: '100%',
+    height: '100%',
   },
   backBtn: { position: 'absolute', top: 16, left: 16, width: 40, height: 40, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
   headerBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md },

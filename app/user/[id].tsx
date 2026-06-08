@@ -119,7 +119,7 @@ export default function PublicProfileScreen() {
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         <View style={styles.profileHeaderCard}>
           <LinearGradient
-            colors={isOrganizer ? ['#1A2035', Colors.bgDark] : [Colors.bgCard, Colors.bgDark]}
+            colors={isOrganizer ? [Colors.bgCardAlt, Colors.bgDark] : [Colors.bgCard, Colors.bgDark]}
             style={styles.gradientBg}
           >
             <View style={styles.avatarWrapper}>

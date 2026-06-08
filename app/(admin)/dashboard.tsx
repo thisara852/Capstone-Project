@@ -280,7 +280,7 @@ export default function AdminDashboard() {
       >
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{flex: 1}}>
           <View style={styles.modalOverlay}>
-            <LinearGradient colors={[Colors.bgCard, '#1A1F30']} style={styles.modalContent}>
+            <LinearGradient colors={[Colors.bgCard, Colors.bgCardAlt]} style={styles.modalContent}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Organizer Details</Text>
                 <TouchableOpacity onPress={() => setSelectedOrganizer(null)}>
@@ -467,14 +467,14 @@ const styles = StyleSheet.create({
   
   // Modal Styles
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', padding: Spacing.md },
-  modalContent: { width: '100%', maxHeight: '90%', borderRadius: BorderRadius.xl, padding: Spacing.lg, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', shadowColor: Colors.primary, shadowOffset: {width: 0, height: 10}, shadowOpacity: 0.3, shadowRadius: 20, elevation: 15 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingBottom: Spacing.md, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.1)', marginBottom: Spacing.md },
+  modalContent: { width: '100%', maxHeight: '90%', borderRadius: BorderRadius.xl, padding: Spacing.lg, borderWidth: 1, borderColor: Colors.border, shadowColor: Colors.primary, shadowOffset: {width: 0, height: 10}, shadowOpacity: 0.1, shadowRadius: 20, elevation: 5 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingBottom: Spacing.md, borderBottomWidth: 1, borderBottomColor: Colors.border, marginBottom: Spacing.md },
   modalTitle: { fontSize: FontSize.lg, fontWeight: 'bold', color: Colors.textPrimary },
   modalScroll: { paddingBottom: Spacing.xl },
   modalAvatarContainer: { alignItems: 'center', marginBottom: Spacing.xl },
   modalName: { fontSize: FontSize.xl, fontWeight: 'bold', color: Colors.textPrimary, marginTop: Spacing.md, textAlign: 'center' },
   modalRole: { fontSize: FontSize.md, color: Colors.primary, marginTop: 4 },
-  modalSection: { backgroundColor: 'rgba(0,0,0,0.3)', padding: Spacing.lg, borderRadius: BorderRadius.lg, marginBottom: Spacing.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  modalSection: { backgroundColor: Colors.bgSurface, padding: Spacing.lg, borderRadius: BorderRadius.lg, marginBottom: Spacing.md, borderWidth: 1, borderColor: Colors.border },
   modalSectionTitle: { fontSize: FontSize.sm, fontWeight: 'bold', color: Colors.textPrimary, marginBottom: Spacing.md, textTransform: 'uppercase', letterSpacing: 1 },
   modalFieldRow: { flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.md, gap: Spacing.md },
   modalFieldValue: { fontSize: FontSize.md, color: Colors.textSecondary, flex: 1 },

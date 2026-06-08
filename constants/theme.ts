@@ -6,37 +6,37 @@ export const Colors = {
   primary: '#1A73E8',
   primaryDark: '#1557B0',
   primaryLight: '#4A9EFF',
-  accent: '#00D4FF',
-  accentGold: '#FFB800',
+  accent: '#1A73E8',
+  accentGold: '#D97706',
 
   // Background
-  bgDark: '#0A0F1E',
-  bgCard: '#111827',
-  bgCardAlt: '#1A2035',
-  bgSurface: '#1E2A40',
-  bgOverlay: 'rgba(10, 15, 30, 0.85)',
+  bgDark: '#FFFFFF',
+  bgCard: '#F8FAFC',
+  bgCardAlt: '#F1F5F9',
+  bgSurface: '#E2E8F0',
+  bgOverlay: 'rgba(255, 255, 255, 0.85)',
 
   // Text
-  textPrimary: '#FFFFFF',
-  textSecondary: '#94A3B8',
+  textPrimary: '#1A73E8',
+  textSecondary: '#1E3A8A',
   textMuted: '#64748B',
-  textAccent: '#00D4FF',
+  textAccent: '#1A73E8',
 
   // Status
-  success: '#22C55E',
-  warning: '#F59E0B',
-  error: '#EF4444',
-  info: '#3B82F6',
+  success: '#16A34A',
+  warning: '#D97706',
+  error: '#DC2626',
+  info: '#2563EB',
 
   // Gradients (used as array for LinearGradient)
-  gradientPrimary: ['#1A73E8', '#00D4FF'],
-  gradientDark: ['#0A0F1E', '#111827'],
-  gradientCard: ['#1A2035', '#111827'],
-  gradientGold: ['#FFB800', '#FF6B00'],
+  gradientPrimary: ['#1A73E8', '#1557B0'],
+  gradientDark: ['#FFFFFF', '#F8FAFC'],
+  gradientCard: ['#FFFFFF', '#F8FAFC'],
+  gradientGold: ['#D97706', '#B45309'],
 
   // Borders
-  border: '#1E2A40',
-  borderLight: '#2D3748',
+  border: '#E2E8F0',
+  borderLight: '#F1F5F9',
 };
 
 export const Spacing = {

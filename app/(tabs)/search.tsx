@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFeedStore } from '../../store/feedStore';
 import { useGroupStore } from '../../store/groupStore';
+import { useUserStore } from '../../store/userStore';
 import { extractSearchKeywords, getSearchSuggestions } from '../../services/nlpService';
 import { IEEE_BRANCHES, IEEE_TOPICS } from '../../config/api';
 import { Colors, Spacing, BorderRadius, FontSize, FontWeight } from '../../constants/theme';
@@ -26,6 +27,8 @@ export default function SearchScreen() {
   const [activeTab, setActiveTab] = useState<'posts' | 'communities' | 'branches' | 'news'>('posts');
   const { posts, news, fetchIEEENews, fetchPosts, isLoading } = useFeedStore();
   const { groups, fetchGroups } = useGroupStore();
+  const { profile } = useUserStore();
+  const isAdmin = profile?.role === 'admin';
 
   useEffect(() => {
     if (posts.length === 0) {
@@ -37,26 +40,26 @@ export default function SearchScreen() {
 
   const filteredPosts = query.trim()
     ? posts.filter((p) => {
-        const kw = extractSearchKeywords(query);
-        const text = `${p.title} ${p.summary} ${p.tags.join(' ')}`.toLowerCase();
-        return kw.some((k) => text.includes(k));
-      })
+      const kw = extractSearchKeywords(query);
+      const text = `${p.title} ${p.summary} ${p.tags.join(' ')}`.toLowerCase();
+      return kw.some((k) => text.includes(k));
+    })
     : posts;
 
   const filteredBranches = query.trim()
     ? IEEE_BRANCHES.filter(
-        (b) =>
-          b.name.toLowerCase().includes(query.toLowerCase()) ||
-          b.university.toLowerCase().includes(query.toLowerCase()) ||
-          b.city.toLowerCase().includes(query.toLowerCase())
-      )
+      (b) =>
+        b.name.toLowerCase().includes(query.toLowerCase()) ||
+        b.university.toLowerCase().includes(query.toLowerCase()) ||
+        b.city.toLowerCase().includes(query.toLowerCase())
+    )
     : IEEE_BRANCHES;
 
   const filteredGroups = query.trim()
-    ? groups.filter(g => 
-        g.name.toLowerCase().includes(query.toLowerCase()) || 
-        g.description?.toLowerCase().includes(query.toLowerCase())
-      )
+    ? groups.filter(g =>
+      g.name.toLowerCase().includes(query.toLowerCase()) ||
+      g.description?.toLowerCase().includes(query.toLowerCase())
+    )
     : groups;
 
   const handleNewsSearch = useCallback(async () => {
@@ -69,11 +72,6 @@ export default function SearchScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.title}>Explore</Text>
-        <Text style={styles.subtitle}>Search posts, branches & news</Text>
-      </View>
 
       {/* Search Bar */}
       <View style={styles.searchBar}>
@@ -109,7 +107,6 @@ export default function SearchScreen() {
       {/* Trending (when empty) */}
       {!query && (
         <View style={styles.trendingSection}>
-          <Text style={styles.sectionTitle}>🔥 Trending Now</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.trendingScroll}>
             {TRENDING.map((t) => (
               <TouchableOpacity key={t} style={styles.trendChip} onPress={() => setQuery(t)}>
@@ -122,21 +119,23 @@ export default function SearchScreen() {
 
       {/* Tabs */}
       <View style={styles.tabs}>
-        {(['posts', 'communities', 'branches', 'news'] as const).map((tab) => (
-          <TouchableOpacity
-            key={tab}
-            style={[styles.tab, activeTab === tab && styles.tabActive]}
-            onPress={() => {
-              setActiveTab(tab);
-              if (tab === 'news') handleNewsSearch();
-              if (tab === 'communities' && groups.length === 0) fetchGroups('All');
-            }}
-          >
-            <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
-            </Text>
-          </TouchableOpacity>
-        ))}
+        {(['posts', 'communities', 'branches', 'news'] as const)
+          .filter((tab) => !(isAdmin && tab === 'communities'))
+          .map((tab) => (
+            <TouchableOpacity
+              key={tab}
+              style={[styles.tab, activeTab === tab && styles.tabActive]}
+              onPress={() => {
+                setActiveTab(tab);
+                if (tab === 'news') handleNewsSearch();
+                if (tab === 'communities' && groups.length === 0) fetchGroups('All');
+              }}
+            >
+              <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              </Text>
+            </TouchableOpacity>
+          ))}
       </View>
 
       {/* Results */}
@@ -175,7 +174,7 @@ export default function SearchScreen() {
             <TouchableOpacity style={styles.branchCard} onPress={() => router.push(`/group/${item.id}`)}>
               <View style={styles.branchAvatar}>
                 {item.avatar ? (
-                  <Image source={{uri: item.avatar}} style={{width: 48, height: 48, borderRadius: 24}} />
+                  <Image source={{ uri: item.avatar }} style={{ width: 48, height: 48, borderRadius: 24 }} />
                 ) : (
                   <Text style={styles.branchAvatarText}>{item.name[0]}</Text>
                 )}
