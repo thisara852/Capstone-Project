@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useUserStore } from '../store/userStore';
 import { useGroupStore, GroupType, GroupVisibility } from '../store/groupStore';
 import { uploadFileToCloudinary } from '../utils/cloudinary';
@@ -39,11 +40,36 @@ export default function CreateGroupScreen() {
     { label: '1 Hour', value: '1h' },
     { label: '1 Day', value: '1d' },
     { label: '1 Week', value: '1w' },
-    { label: '30 Days', value: '30d' }
+    { label: '30 Days', value: '30d' },
+    { label: 'Custom', value: 'custom' }
   ];
   const [duration, setDuration] = useState('never');
+  const [customDate, setCustomDate] = useState<Date>(new Date(Date.now() + 24 * 60 * 60 * 1000)); // Default 1 day
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const onDateChange = (event: any, selectedDate?: Date) => {
+    setShowDatePicker(false);
+    if (selectedDate) {
+      const newDate = new Date(customDate);
+      selectedDate.setHours(newDate.getHours());
+      selectedDate.setMinutes(newDate.getMinutes());
+      setCustomDate(selectedDate);
+      setShowTimePicker(true);
+    }
+  };
+
+  const onTimeChange = (event: any, selectedTime?: Date) => {
+    setShowTimePicker(false);
+    if (selectedTime) {
+      const newDate = new Date(customDate);
+      newDate.setHours(selectedTime.getHours());
+      newDate.setMinutes(selectedTime.getMinutes());
+      setCustomDate(newDate);
+    }
+  };
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -83,7 +109,9 @@ export default function CreateGroupScreen() {
         duration,
       };
 
-      if (duration !== 'never') {
+      if (duration === 'custom') {
+        groupPayload.expiresAt = customDate.getTime();
+      } else if (duration !== 'never') {
         let ms = 0;
         if (duration === '1h') ms = 60 * 60 * 1000;
         if (duration === '1d') ms = 24 * 60 * 60 * 1000;
@@ -214,6 +242,19 @@ export default function CreateGroupScreen() {
               </TouchableOpacity>
             ))}
           </ScrollView>
+          {duration === 'custom' && (
+            <View style={{ marginTop: 12 }}>
+              <TouchableOpacity 
+                style={styles.customDateBtn} 
+                onPress={() => setShowDatePicker(true)}
+              >
+                <Ionicons name="calendar-outline" size={20} color={Colors.primary} />
+                <Text style={styles.customDateText}>
+                  {customDate.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
         <View style={styles.submitWrap}>
@@ -226,6 +267,24 @@ export default function CreateGroupScreen() {
         </View>
 
       </ScrollView>
+
+      {showDatePicker && (
+        <DateTimePicker
+          value={customDate}
+          mode="date"
+          display="default"
+          minimumDate={new Date()}
+          onChange={onDateChange}
+        />
+      )}
+      {showTimePicker && (
+        <DateTimePicker
+          value={customDate}
+          mode="time"
+          display="default"
+          onChange={onTimeChange}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -299,6 +358,23 @@ const styles = StyleSheet.create({
   radioBtnActive: { borderColor: Colors.primary, backgroundColor: Colors.primary + '11' },
   radioText: { color: Colors.textSecondary, fontWeight: '500' },
   radioTextActive: { color: Colors.primary },
+
+  customDateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: Colors.bgCard,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    marginTop: 4,
+  },
+  customDateText: {
+    color: Colors.textPrimary,
+    fontSize: FontSize.md,
+    fontWeight: '500',
+  },
 
   submitWrap: { marginTop: Spacing.xl, marginBottom: 40 },
 });
