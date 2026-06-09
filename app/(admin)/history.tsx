@@ -12,12 +12,12 @@ type Tab = 'organizers' | 'events';
 
 export default function AdminHistory() {
   const { profile, logout } = useUserStore();
-  const { 
-    organizers, 
-    events, 
-    isLoading, 
+  const {
+    organizers,
+    events,
+    isLoading,
     error,
-    fetchOrganizers, 
+    fetchOrganizers,
     fetchEvents,
     updateOrganizerStatus,
     updateEventStatus,
@@ -46,8 +46,8 @@ export default function AdminHistory() {
       `Are you sure you want to ${actionText.toLowerCase()} ${user.displayName}?`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: actionText, 
+        {
+          text: actionText,
           style: status === 'verified' ? 'default' : 'destructive',
           onPress: () => updateOrganizerStatus(user.uid, status)
         }
@@ -61,8 +61,8 @@ export default function AdminHistory() {
       `Are you sure you want to completely delete ${user.displayName} from the database? This cannot be undone.`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
+        {
+          text: 'Delete',
           style: 'destructive',
           onPress: () => deleteOrganizer(user.uid)
         }
@@ -76,8 +76,8 @@ export default function AdminHistory() {
       `Are you sure you want to completely delete "${event.title}"? This cannot be undone.`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
+        {
+          text: 'Delete',
           style: 'destructive',
           onPress: () => deleteEvent(event.id)
         }
@@ -101,7 +101,7 @@ export default function AdminHistory() {
             <Text style={styles.cardTitle}>{item.displayName}</Text>
             <Text style={styles.cardSubtitle}>{item.email}</Text>
             <Text style={[
-              styles.statusText, 
+              styles.statusText,
               { color: item.verificationStatus === 'verified' ? Colors.success : (item.verificationStatus === 'rejected' ? Colors.error : Colors.warning) }
             ]}>
               {item.verificationStatus?.toUpperCase() || 'PENDING'}
@@ -109,7 +109,7 @@ export default function AdminHistory() {
           </View>
         </View>
       </View>
-      
+
       <View style={styles.detailsBox}>
         <Text style={styles.detailText}>🏢 {item.organizationName}</Text>
         <Text style={styles.detailText}>🌐 Section: {item.ieeeSection}</Text>
@@ -117,15 +117,15 @@ export default function AdminHistory() {
       </View>
 
       <View style={styles.actionRow}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.actionBtn, { flex: 0.3, backgroundColor: Colors.error + '22', borderColor: Colors.error + '44', borderWidth: 1 }]}
           onPress={() => handleDeleteOrganizer(item)}
         >
           <Ionicons name="trash" size={20} color={Colors.error} />
         </TouchableOpacity>
-        
+
         {item.verificationStatus === 'verified' ? (
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.actionBtn, styles.rejectBtn]}
             onPress={() => handleOrganizerStatus(item, 'rejected')}
           >
@@ -133,7 +133,7 @@ export default function AdminHistory() {
             <Text style={[styles.actionText, { color: Colors.error }]}>Remove Access</Text>
           </TouchableOpacity>
         ) : (
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.actionBtn, styles.approveBtn]}
             onPress={() => handleOrganizerStatus(item, 'verified')}
           >
@@ -146,7 +146,7 @@ export default function AdminHistory() {
   );
 
   const renderEvent = ({ item }: { item: Post }) => (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={styles.card}
       activeOpacity={0.7}
       onPress={() => router.push(`/post/${item.id}`)}
@@ -158,16 +158,16 @@ export default function AdminHistory() {
             <Ionicons name="business" size={12} color={Colors.textMuted} /> Organizer: {getOrganizerName(item.authorId, item.author)}
           </Text>
           <Text style={[
-            styles.statusText, 
+            styles.statusText,
             { color: item.status === 'approved' ? Colors.success : (item.status === 'rejected' ? Colors.error : Colors.warning) }
           ]}>
             {item.status?.toUpperCase() || 'PENDING'}
           </Text>
         </View>
       </View>
-      
+
       <Text style={styles.eventDesc} numberOfLines={3}>{item.content}</Text>
-      
+
       <View style={styles.detailsBox}>
         {item.eventDate && <Text style={styles.detailText}>📅 {new Date(item.eventDate).toLocaleDateString()}</Text>}
         {item.eventLocation && <Text style={styles.detailText}>📍 {item.eventLocation}</Text>}
@@ -177,7 +177,7 @@ export default function AdminHistory() {
       </View>
 
       <View style={styles.actionRow}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.actionBtn, styles.rejectBtn]}
           onPress={() => handleEventAction(item)}
         >
@@ -193,12 +193,6 @@ export default function AdminHistory() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <TouchableOpacity 
-          onPress={() => router.back()} 
-          style={styles.backBtn}
-        >
-          <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
-        </TouchableOpacity>
         <View style={{ flex: 1, marginLeft: Spacing.md }}>
           <Text style={styles.greeting}>History & Records</Text>
           <Text style={styles.orgName}>Past approved and rejected items</Text>
@@ -217,7 +211,7 @@ export default function AdminHistory() {
       </View>
 
       <View style={styles.tabs}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.tab, activeTab === 'organizers' && styles.tabActive]}
           onPress={() => setActiveTab('organizers')}
         >
@@ -225,7 +219,7 @@ export default function AdminHistory() {
             Organizers
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.tab, activeTab === 'events' && styles.tabActive]}
           onPress={() => setActiveTab('events')}
         >

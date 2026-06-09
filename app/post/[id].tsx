@@ -72,7 +72,7 @@ export default function PostDetailScreen() {
   const isCreatorOrganizer = post?.authorId === user?.uid;
   const isAdmin = profile?.role === 'admin';
   const isApprovedParticipant = currentRegistration?.status === 'approved' || currentRegistration?.status === 'checked-in';
-  const canAccessChat = post?.type === 'event' && (isCreatorOrganizer || isAdmin || isApprovedParticipant);
+  const canAccessChat = post?.type === 'event' && !isAdmin && (isCreatorOrganizer || isApprovedParticipant);
 
   if (!post) {
     return (

@@ -211,12 +211,6 @@ export default function AdminDashboard() {
             <Ionicons name="home-outline" size={24} color={Colors.textSecondary} />
           </TouchableOpacity>
           <TouchableOpacity 
-            onPress={() => router.push('/(admin)/history')} 
-            style={[styles.logoutBtn, { backgroundColor: Colors.primary + '22' }]}
-          >
-            <Ionicons name="time-outline" size={24} color={Colors.primary} />
-          </TouchableOpacity>
-          <TouchableOpacity 
             onPress={async () => {
               await logout();
               router.replace('/(auth)/login');

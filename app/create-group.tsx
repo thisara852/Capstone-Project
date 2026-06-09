@@ -34,6 +34,15 @@ export default function CreateGroupScreen() {
   const [visibility, setVisibility] = useState<GroupVisibility>('public');
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   
+  const DURATION_OPTIONS = [
+    { label: 'Never', value: 'never' },
+    { label: '1 Hour', value: '1h' },
+    { label: '1 Day', value: '1d' },
+    { label: '1 Week', value: '1w' },
+    { label: '30 Days', value: '30d' }
+  ];
+  const [duration, setDuration] = useState('never');
+
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const pickImage = async () => {
@@ -71,7 +80,17 @@ export default function CreateGroupScreen() {
         tags: [],
         type: isOrganizer ? 'event' : 'circle', // By default, organizers create official communities
         verified: isOrganizer,
+        duration,
       };
+
+      if (duration !== 'never') {
+        let ms = 0;
+        if (duration === '1h') ms = 60 * 60 * 1000;
+        if (duration === '1d') ms = 24 * 60 * 60 * 1000;
+        if (duration === '1w') ms = 7 * 24 * 60 * 60 * 1000;
+        if (duration === '30d') ms = 30 * 24 * 60 * 60 * 1000;
+        groupPayload.expiresAt = Date.now() + ms;
+      }
 
       if (avatarUrl) {
         groupPayload.avatar = avatarUrl;
@@ -100,7 +119,7 @@ export default function CreateGroupScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        
+
         {/* Avatar Picker */}
         <View style={styles.avatarContainer}>
           <TouchableOpacity style={styles.avatarCircle} onPress={pickImage}>
@@ -163,15 +182,15 @@ export default function CreateGroupScreen() {
         <View style={styles.formGroup}>
           <Text style={styles.label}>Visibility</Text>
           <View style={styles.row}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[styles.radioBtn, visibility === 'public' && styles.radioBtnActive]}
               onPress={() => setVisibility('public')}
             >
               <Ionicons name="globe-outline" size={20} color={visibility === 'public' ? Colors.primary : Colors.textMuted} />
               <Text style={[styles.radioText, visibility === 'public' && styles.radioTextActive]}>Public</Text>
             </TouchableOpacity>
-            
-            <TouchableOpacity 
+
+            <TouchableOpacity
               style={[styles.radioBtn, visibility === 'private' && styles.radioBtnActive]}
               onPress={() => setVisibility('private')}
             >
@@ -181,8 +200,24 @@ export default function CreateGroupScreen() {
           </View>
         </View>
 
+        {/* Duration / Expiration */}
+        <View style={styles.formGroup}>
+          <Text style={styles.label}>Auto Delete After</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.catScroll}>
+            {DURATION_OPTIONS.map(opt => (
+              <TouchableOpacity
+                key={opt.value}
+                style={[styles.catChip, duration === opt.value && styles.catChipActive]}
+                onPress={() => setDuration(opt.value)}
+              >
+                <Text style={[styles.catText, duration === opt.value && styles.catTextActive]}>{opt.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
         <View style={styles.submitWrap}>
-          <FormButton 
+          <FormButton
             label={isOrganizer ? "Create Community" : "Create Circle"}
             onPress={handleCreate}
             isLoading={isSubmitting}
@@ -208,7 +243,7 @@ const styles = StyleSheet.create({
   },
   backBtn: { padding: 4 },
   headerTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.textPrimary },
-  
+
   content: { padding: Spacing.xl },
 
   avatarContainer: { alignItems: 'center', marginBottom: Spacing.xl },

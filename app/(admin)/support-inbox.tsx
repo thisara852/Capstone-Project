@@ -40,9 +40,6 @@ export default function AdminSupportInboxScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
-        </TouchableOpacity>
         <Text style={styles.title}>Support Inbox</Text>
         <View style={{ width: 40 }} />
       </View>
@@ -82,7 +79,7 @@ const styles = StyleSheet.create({
   },
   backBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.bgSurface, justifyContent: 'center', alignItems: 'center' },
   title: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.textPrimary },
-  
+
   listContainer: { padding: Spacing.lg },
   ticketCard: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.bgSurface,
@@ -102,7 +99,7 @@ const styles = StyleSheet.create({
   },
   statusDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.success, marginRight: 4 },
   statusText: { fontSize: FontSize.xs, color: Colors.success, fontWeight: 'bold' },
-  
+
   centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: Spacing.xl },
   emptyTitle: { fontSize: FontSize.xl, fontWeight: 'bold', color: Colors.textPrimary, marginTop: Spacing.md, marginBottom: Spacing.xs },
   emptyText: { fontSize: FontSize.md, color: Colors.textSecondary, textAlign: 'center' },
