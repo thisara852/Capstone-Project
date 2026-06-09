@@ -56,7 +56,12 @@ export default function PostDetailScreen() {
   let regStatusMessage = 'Register for Event';
   let isRegActive = post?.registrationOpen !== false;
 
-  if (post?.type === 'event' && post.registrationStartDate && post.registrationEndDate) {
+  const hasOtherRegistration = !isRegistered && userTickets.length > 0;
+
+  if (hasOtherRegistration) {
+    isRegActive = false;
+    regStatusMessage = 'Registered for Another Event';
+  } else if (post?.type === 'event' && post.registrationStartDate && post.registrationEndDate) {
     const now = Date.now();
     if (now < post.registrationStartDate) {
       isRegActive = false;

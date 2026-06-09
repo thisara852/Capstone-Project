@@ -105,6 +105,13 @@ export const useRegistrationStore = create<RegistrationStore>()(
         throw new Error("You are already registered for this event.");
       }
 
+      // Check if they are registered for ANY other event
+      const regsQuery = query(collectionGroup(db, 'registrations'), where('userId', '==', user.uid));
+      const regsSnap = await getDocs(regsQuery);
+      if (!regsSnap.empty) {
+        throw new Error("You are already registered for another event. Users can only register for one event.");
+      }
+
       const registration: Registration = {
         id: user.uid,
         userId: user.uid,
