@@ -35,28 +35,28 @@ export default function CreateGroupScreen() {
   const [visibility, setVisibility] = useState<GroupVisibility>('public');
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   
-  const DURATION_OPTIONS = [
-    { label: 'Never', value: 'never' },
-    { label: '1 Hour', value: '1h' },
-    { label: '1 Day', value: '1d' },
-    { label: '1 Week', value: '1w' },
-    { label: '30 Days', value: '30d' },
-    { label: 'Custom', value: 'custom' }
-  ];
-  const [duration, setDuration] = useState('never');
   const [customDate, setCustomDate] = useState<Date>(new Date(Date.now() + 24 * 60 * 60 * 1000)); // Default 1 day
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const [dateError, setDateError] = useState('');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const onDateChange = (event: any, selectedDate?: Date) => {
     setShowDatePicker(false);
     if (selectedDate) {
+      const now = Date.now();
+      if (selectedDate.getTime() <= now) {
+        const msg = 'Expiration date must be in the future.';
+        setDateError(msg);
+        Alert.alert('Validation Error', msg);
+        return;
+      }
       const newDate = new Date(customDate);
       selectedDate.setHours(newDate.getHours());
       selectedDate.setMinutes(newDate.getMinutes());
       setCustomDate(selectedDate);
+      setDateError('');
       setShowTimePicker(true);
     }
   };
@@ -90,7 +90,10 @@ export default function CreateGroupScreen() {
       return;
     }
     if (!user) return;
-
+    if (dateError) {
+      Alert.alert('Validation Error', dateError);
+      return;
+    }
     setIsSubmitting(true);
     try {
       let avatarUrl = undefined;
@@ -106,19 +109,9 @@ export default function CreateGroupScreen() {
         tags: [],
         type: isOrganizer ? 'event' : 'circle', // By default, organizers create official communities
         verified: isOrganizer,
-        duration,
       };
 
-      if (duration === 'custom') {
-        groupPayload.expiresAt = customDate.getTime();
-      } else if (duration !== 'never') {
-        let ms = 0;
-        if (duration === '1h') ms = 60 * 60 * 1000;
-        if (duration === '1d') ms = 24 * 60 * 60 * 1000;
-        if (duration === '1w') ms = 7 * 24 * 60 * 60 * 1000;
-        if (duration === '30d') ms = 30 * 24 * 60 * 60 * 1000;
-        groupPayload.expiresAt = Date.now() + ms;
-      }
+      groupPayload.expiresAt = customDate.getTime();
 
       if (avatarUrl) {
         groupPayload.avatar = avatarUrl;
@@ -230,31 +223,34 @@ export default function CreateGroupScreen() {
 
         {/* Duration / Expiration */}
         <View style={styles.formGroup}>
-          <Text style={styles.label}>Auto Delete After</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.catScroll}>
-            {DURATION_OPTIONS.map(opt => (
-              <TouchableOpacity
-                key={opt.value}
-                style={[styles.catChip, duration === opt.value && styles.catChipActive]}
-                onPress={() => setDuration(opt.value)}
-              >
-                <Text style={[styles.catText, duration === opt.value && styles.catTextActive]}>{opt.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-          {duration === 'custom' && (
-            <View style={{ marginTop: 12 }}>
-              <TouchableOpacity 
-                style={styles.customDateBtn} 
-                onPress={() => setShowDatePicker(true)}
-              >
-                <Ionicons name="calendar-outline" size={20} color={Colors.primary} />
-                <Text style={styles.customDateText}>
-                  {customDate.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          )}
+          <Text style={styles.label}>Auto Delete After Date</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+            <TouchableOpacity 
+              style={styles.customDateBtn} 
+              onPress={() => setShowDatePicker(true)}
+            >
+              <Ionicons name="calendar-outline" size={20} color={Colors.primary} />
+              <Text style={styles.customDateText}>
+                {customDate.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.customDateBtn, { backgroundColor: Colors.bgSurface, borderColor: Colors.border }]} 
+              onPress={() => {
+                // Reset to default tomorrow
+                const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+                setCustomDate(tomorrow);
+                setDateError('');
+              }}
+            >
+              <Ionicons name="close-circle" size={20} color={Colors.error} />
+              <Text style={styles.customDateText}>Clear</Text>
+            </TouchableOpacity>
+          </View>
+          {dateError ? <Text style={{ color: Colors.error, marginTop: 4, fontSize: FontSize.xs }}>{dateError}</Text> : null}
+          <View style={{ marginTop: 4 }}>
+            <Text style={{ color: Colors.textSecondary, fontSize: FontSize.sm }}>Selected expiration: {customDate.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</Text>
+          </View>
         </View>
 
         <View style={styles.submitWrap}>
