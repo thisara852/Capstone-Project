@@ -65,14 +65,12 @@ export default function OrganizerSettings() {
           <View style={styles.divider} />
           <SettingItem icon="business-outline" title="Organization Details" onPress={() => router.push('/(settings)/edit-profile')} />
           <View style={styles.divider} />
-          <SettingItem icon="lock-closed-outline" title="Change Password" onPress={() => dummyAction('Change Password')} />
+          <SettingItem icon="lock-closed-outline" title="Change Password" onPress={() => router.push('/(settings)/privacy')} />
         </View>
 
         <Text style={styles.sectionHeader}>Preferences</Text>
         <View style={styles.card}>
-          <SettingItem icon="notifications-outline" title="Notifications" onPress={() => dummyAction('Notifications')} />
-          <View style={styles.divider} />
-          <SettingItem icon="moon-outline" title="Dark Mode" onPress={() => dummyAction('Theme')} hasSwitch />
+          <SettingItem icon="notifications-outline" title="Notifications" onPress={() => router.push('/(tabs)/notifications')} />
         </View>
 
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>

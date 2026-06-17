@@ -232,7 +232,7 @@ export default function GroupsScreen() {
                 <TouchableOpacity
                   key={group.id}
                   style={styles.chatRow}
-                  onPress={() => router.push(`/group/${group.id}`)}
+                  onPress={() => router.push(`/group/${group.id}/chat`)}
                   activeOpacity={0.75}
                 >
                   <View style={[styles.chatAvatar, { backgroundColor: avatarColor }]}>

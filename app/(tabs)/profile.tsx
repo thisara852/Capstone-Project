@@ -328,7 +328,10 @@ export default function ProfileScreen() {
               label: 'Help & Support',
               action: () => router.push('/(settings)/support')
             },
-          ].map((item) => (
+          ].filter(item => {
+            if (profile?.role === 'admin' && item.label === 'Help & Support') return false;
+            return true;
+          }).map((item) => (
             <TouchableOpacity key={item.label} style={styles.menuItem} onPress={item.action}>
               <View style={styles.menuIcon}>
                 <Ionicons name={item.icon as any} size={18} color={Colors.textPrimary} />

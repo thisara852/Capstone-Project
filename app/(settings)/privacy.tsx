@@ -19,8 +19,10 @@ export default function PrivacySecurityScreen() {
   
   const [currentPass, setCurrentPass] = useState('');
   const [newPass, setNewPass] = useState('');
+  const [confirmNewPass, setConfirmNewPass] = useState('');
   const [deactivatePass, setDeactivatePass] = useState('');
   const [loading, setLoading] = useState(false);
+  const isAdmin = profile?.role === 'admin';
 
   const handleTogglePublic = async (val: boolean) => {
     setIsPublic(val);
@@ -33,8 +35,16 @@ export default function PrivacySecurityScreen() {
   };
 
   const handleChangePassword = async () => {
-    if (!currentPass || !newPass) {
+    if (!currentPass || !newPass || !confirmNewPass) {
       Alert.alert('Error', 'Please fill in all fields.');
+      return;
+    }
+    if (newPass.length < 8) {
+      Alert.alert('Error', 'New password must be at least 8 characters long.');
+      return;
+    }
+    if (newPass !== confirmNewPass) {
+      Alert.alert('Error', 'New passwords do not match.');
       return;
     }
     setLoading(true);
@@ -45,6 +55,7 @@ export default function PrivacySecurityScreen() {
       setShowPassModal(false);
       setCurrentPass('');
       setNewPass('');
+      setConfirmNewPass('');
     } catch (err: any) {
       // Error is handled by store and shown via Alert or UI
       Alert.alert('Error', err.message);
@@ -95,42 +106,46 @@ export default function PrivacySecurityScreen() {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Ionicons name="eye" size={24} color={Colors.accentGold} />
-            <Text style={styles.cardTitle}>Data Privacy</Text>
-          </View>
-          <View style={styles.settingRow}>
-            <View style={{ flex: 1, paddingRight: Spacing.md }}>
-              <Text style={styles.settingLabel}>Profile Visibility</Text>
-              <Text style={styles.settingDesc}>Allow other students to see your profile and joined groups</Text>
+        {!isAdmin && (
+          <>
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <Ionicons name="eye" size={24} color={Colors.accentGold} />
+                <Text style={styles.cardTitle}>Data Privacy</Text>
+              </View>
+              <View style={styles.settingRow}>
+                <View style={{ flex: 1, paddingRight: Spacing.md }}>
+                  <Text style={styles.settingLabel}>Profile Visibility</Text>
+                  <Text style={styles.settingDesc}>Allow other students to see your profile and joined groups</Text>
+                </View>
+                <Switch
+                  value={isPublic}
+                  onValueChange={handleTogglePublic}
+                  trackColor={{ false: Colors.border, true: Colors.primary }}
+                  thumbColor={Platform.OS === 'ios' ? '#fff' : isPublic ? '#fff' : '#f4f3f4'}
+                />
+              </View>
+              <View style={styles.divider} />
+              <View style={styles.settingRow}>
+                <View style={{ flex: 1, paddingRight: Spacing.md }}>
+                  <Text style={styles.settingLabel}>Data Sharing</Text>
+                  <Text style={styles.settingDesc}>Share basic contact info with organizers when registering for events</Text>
+                </View>
+                <Switch
+                  value={shareData}
+                  onValueChange={handleToggleShare}
+                  trackColor={{ false: Colors.border, true: Colors.primary }}
+                  thumbColor={Platform.OS === 'ios' ? '#fff' : shareData ? '#fff' : '#f4f3f4'}
+                />
+              </View>
             </View>
-            <Switch
-              value={isPublic}
-              onValueChange={handleTogglePublic}
-              trackColor={{ false: Colors.border, true: Colors.primary }}
-              thumbColor={Platform.OS === 'ios' ? '#fff' : isPublic ? '#fff' : '#f4f3f4'}
-            />
-          </View>
-          <View style={styles.divider} />
-          <View style={styles.settingRow}>
-            <View style={{ flex: 1, paddingRight: Spacing.md }}>
-              <Text style={styles.settingLabel}>Data Sharing</Text>
-              <Text style={styles.settingDesc}>Share basic contact info with organizers when registering for events</Text>
-            </View>
-            <Switch
-              value={shareData}
-              onValueChange={handleToggleShare}
-              trackColor={{ false: Colors.border, true: Colors.primary }}
-              thumbColor={Platform.OS === 'ios' ? '#fff' : shareData ? '#fff' : '#f4f3f4'}
-            />
-          </View>
-        </View>
 
-        <TouchableOpacity style={styles.deleteBtn} onPress={() => setShowDeactivateModal(true)}>
-          <Ionicons name="warning-outline" size={20} color={Colors.error} />
-          <Text style={styles.deleteText}>Deactivate Account</Text>
-        </TouchableOpacity>
+            <TouchableOpacity style={styles.deleteBtn} onPress={() => setShowDeactivateModal(true)}>
+              <Ionicons name="warning-outline" size={20} color={Colors.error} />
+              <Text style={styles.deleteText}>Deactivate Account</Text>
+            </TouchableOpacity>
+          </>
+        )}
       </ScrollView>
 
       {/* Change Password Modal */}
@@ -153,11 +168,20 @@ export default function PrivacySecurityScreen() {
             />
             <FormInput
               label="New Password"
-              placeholder="Enter new password"
+              placeholder="Enter new password (8+ chars)"
               value={newPass}
               onChangeText={setNewPass}
               secureTextEntry
               icon="lock-closed-outline"
+            />
+            <FormInput
+              label="Confirm New Password"
+              placeholder="Re-enter new password"
+              value={confirmNewPass}
+              onChangeText={setConfirmNewPass}
+              secureTextEntry
+              icon="lock-closed-outline"
+              error={confirmNewPass && newPass !== confirmNewPass ? "Passwords do not match" : undefined}
             />
             <FormButton
               label="Update Password"

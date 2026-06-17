@@ -28,6 +28,7 @@ const step2Schema = z.object({
   organizationName: z.string().min(2, 'Organization Name is required').trim(),
   organizationType: z.enum(['Student Branch', 'Chapter', 'Affinity Group', 'Section']),
   ieeeSection: z.string().min(2, 'IEEE Section is required').trim(),
+  university: z.string().min(1, 'University is required').trim(),
 });
 
 const step3Schema = z.object({
@@ -75,7 +76,7 @@ export default function OrganizerSignupScreen() {
     { label: 'IEEE Section', value: 'Section' }
   ];
 
-  const branchOptions = [{ label: 'None / Not Applicable', value: '' }, ...IEEE_BRANCHES.map(b => ({ label: `${b.university} - ${b.name}`, value: b.university }))];
+  const branchOptions = IEEE_BRANCHES.map(b => ({ label: `${b.university} - ${b.name}`, value: b.university }));
 
   const validateStep = () => {
     setFormErrors({});
@@ -313,10 +314,11 @@ export default function OrganizerSignupScreen() {
                 error={formErrors.ieeeSection}
               />
               <FormSelect
-                label="University (Optional)"
+                label="University *"
                 options={branchOptions}
                 value={formData.university}
-                onSelect={(val) => setFormData(prev => ({ ...prev, university: val }))}
+                onSelect={(val) => setFormData(prev => ({ ...prev, university: val as string }))}
+                error={formErrors.university}
                 icon="school-outline"
               />
             </View>

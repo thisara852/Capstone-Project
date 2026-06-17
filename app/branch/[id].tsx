@@ -12,6 +12,9 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { db } from '../../config/firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { useUserStore } from '../../store/userStore';
 import { IEEE_BRANCHES } from '../../config/api';
 import { Colors, Spacing, BorderRadius, FontSize, FontWeight } from '../../constants/theme';
 
@@ -45,6 +48,19 @@ const BRANCH_LEADERS: Record<string, { name: string; role: string }[]> = {
 export default function BranchDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const branch = IEEE_BRANCHES.find((b) => b.id === id);
+  const { profile, toggleFollowBranch } = useUserStore();
+  const isAdmin = profile?.role === 'admin';
+  const [followerCount, setFollowerCount] = React.useState(0);
+
+  React.useEffect(() => {
+    if (!id) return;
+    const unsub = onSnapshot(doc(db, 'branches', id), (docSnap) => {
+      if (docSnap.exists()) {
+        setFollowerCount(docSnap.data().followerCount || 0);
+      }
+    });
+    return () => unsub();
+  }, [id]);
 
   if (!branch) {
     return (
@@ -83,10 +99,29 @@ export default function BranchDetailScreen() {
             <Ionicons name="location" size={14} color={Colors.error} />
             <Text style={styles.city}>{branch.city}, Sri Lanka</Text>
           </View>
+          <View style={styles.locationRow}>
+            <Ionicons name="people" size={14} color={Colors.textSecondary} />
+            <Text style={styles.city}>{followerCount} Followers</Text>
+          </View>
           <View style={styles.ieeeTag}>
             <Text style={styles.ieeeTagText}>IEEE Student Branch</Text>
           </View>
         </LinearGradient>
+
+        {/* Admin Info */}
+        {isAdmin && (
+          <View style={styles.adminSection}>
+            <Text style={styles.sectionTitle}>Admin Diagnostics</Text>
+            <View style={styles.adminCard}>
+              <Text style={styles.adminText}>Branch ID: {branch.id}</Text>
+              <Text style={styles.adminText}>System Name: {branch.name}</Text>
+              <Text style={styles.adminText}>Institution: {branch.university}</Text>
+              <View style={styles.adminBadge}>
+                <Text style={styles.adminBadgeText}>ADMIN VIEW</Text>
+              </View>
+            </View>
+          </View>
+        )}
 
         {/* Activities */}
         <View style={styles.section}>
@@ -156,17 +191,28 @@ export default function BranchDetailScreen() {
         </View>
 
         {/* CTA */}
-        <TouchableOpacity style={styles.followBtn}>
-          <LinearGradient
-            colors={Colors.gradientPrimary as [string, string]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.followGradient}
+        {!isAdmin && (
+          <TouchableOpacity 
+            style={styles.followBtn} 
+            onPress={() => toggleFollowBranch(branch.id)}
           >
-            <Ionicons name="add-circle" size={20} color="#fff" />
-            <Text style={styles.followText}>Follow {branch.name} Branch</Text>
-          </LinearGradient>
-        </TouchableOpacity>
+            <LinearGradient
+              colors={profile?.followedBranches?.includes(branch.id) ? [Colors.bgCardAlt, Colors.bgCard] : Colors.gradientPrimary as [string, string]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={[styles.followGradient, profile?.followedBranches?.includes(branch.id) && { borderWidth: 1, borderColor: Colors.border }]}
+            >
+              <Ionicons 
+                name={profile?.followedBranches?.includes(branch.id) ? "checkmark-circle" : "add-circle"} 
+                size={20} 
+                color={profile?.followedBranches?.includes(branch.id) ? Colors.primary : "#fff"} 
+              />
+              <Text style={[styles.followText, profile?.followedBranches?.includes(branch.id) && { color: Colors.primary }]}>
+                {profile?.followedBranches?.includes(branch.id) ? 'Following' : `Follow ${branch.name} Branch`}
+              </Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -207,4 +253,9 @@ const styles = StyleSheet.create({
   followBtn: { marginHorizontal: Spacing.lg, borderRadius: BorderRadius.md, overflow: 'hidden' },
   followGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 16, gap: 8 },
   followText: { color: '#fff', fontSize: FontSize.base, fontWeight: FontWeight.bold },
+  adminSection: { paddingHorizontal: Spacing.lg, marginBottom: Spacing.lg, marginTop: Spacing.sm },
+  adminCard: { backgroundColor: Colors.bgDark, borderRadius: BorderRadius.lg, padding: Spacing.md, borderWidth: 1, borderColor: Colors.primary + '88', gap: 6 },
+  adminText: { color: Colors.textSecondary, fontSize: FontSize.sm, fontFamily: 'monospace' },
+  adminBadge: { position: 'absolute', top: Spacing.md, right: Spacing.md, backgroundColor: Colors.primary, paddingHorizontal: 8, paddingVertical: 4, borderRadius: BorderRadius.sm },
+  adminBadgeText: { color: '#fff', fontSize: FontSize.xs, fontWeight: FontWeight.bold },
 });

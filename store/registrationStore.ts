@@ -41,6 +41,7 @@ export interface Registration {
   department?: string;
   experienceLevel?: string;
   teamName?: string;
+  teamMemberEmails?: string[];
   specialNotes?: string;
   registrationStatus?: 'pending' | 'approved' | 'rejected' | 'waitlisted';
   registrationData?: Record<string, string>;
@@ -101,16 +102,11 @@ export const useRegistrationStore = create<RegistrationStore>()(
 
       const regRef = doc(db, 'posts', eventId, 'registrations', user.uid);
       const regDoc = await getDoc(regRef);
-      if (regDoc.exists()) {
-        throw new Error("You are already registered for this event.");
+      if (regDoc.exists() && regDoc.data().status === 'approved') {
+        throw new Error("You are already approved for this event. Cannot edit registration.");
       }
 
-      // Check if they are registered for ANY other event
-      const regsQuery = query(collectionGroup(db, 'registrations'), where('userId', '==', user.uid));
-      const regsSnap = await getDocs(regsQuery);
-      if (!regsSnap.empty) {
-        throw new Error("You are already registered for another event. Users can only register for one event.");
-      }
+      const { teamMemberEmails, ...cleanExtraData } = extraData || {};
 
       const registration: Registration = {
         id: user.uid,
@@ -121,10 +117,11 @@ export const useRegistrationStore = create<RegistrationStore>()(
         userDisplayName: profile.displayName || 'Unknown User',
         userEmail: profile.email || '',
         userAvatar: profile.photoURL || '',
-        studentId: extraData?.studentId || '',
+        studentId: cleanExtraData.studentId || '',
         userUniversity: profile.university || 'Not specified',
         userBranch: profile.branch || 'Not specified',
-        ...extraData,
+        teamMemberEmails: teamMemberEmails || [],
+        ...cleanExtraData,
       };
 
       const cleanedRegistration = Object.keys(registration).reduce((acc, key) => {
@@ -135,12 +132,64 @@ export const useRegistrationStore = create<RegistrationStore>()(
         return acc;
       }, {} as any);
 
-      await setDoc(regRef, cleanedRegistration);
+      await setDoc(regRef, cleanedRegistration, { merge: true });
       
+      let registeredCountInc = regDoc.exists() ? 0 : 1;
+
+      // Handle Teammates
+      if (teamMemberEmails && teamMemberEmails.length > 0) {
+        try {
+          for (const email of teamMemberEmails) {
+            const uQuery = query(collection(db, 'users'), where('email', '==', email.toLowerCase().trim()));
+            const uSnap = await getDocs(uQuery);
+            
+            if (!uSnap.empty) {
+              const teammateDoc = uSnap.docs[0];
+              const teammateId = teammateDoc.id;
+              const teammateData = teammateDoc.data();
+
+              // Check if teammate is already registered
+              const teammateRegRef = doc(db, 'posts', eventId, 'registrations', teammateId);
+              const teammateRegDoc = await getDoc(teammateRegRef);
+              
+              if (!teammateRegDoc.exists()) {
+                const teammateRegistration: Registration = {
+                  id: teammateId,
+                  userId: teammateId,
+                  eventId,
+                  status: 'pending',
+                  registeredAt: Date.now(),
+                  userDisplayName: teammateData.displayName || 'Unknown User',
+                  userEmail: teammateData.email || '',
+                  userAvatar: teammateData.photoURL || '',
+                  studentId: teammateData.studentId || '',
+                  userUniversity: teammateData.university || 'Not specified',
+                  userBranch: teammateData.branch || 'Not specified',
+                  teamName: cleanExtraData.teamName,
+                  registrationStatus: 'pending',
+                };
+
+                const cleanedTeammateReg = Object.keys(teammateRegistration).reduce((acc, key) => {
+                  const val = teammateRegistration[key as keyof Registration];
+                  if (val !== undefined) acc[key] = val;
+                  return acc;
+                }, {} as any);
+
+                await setDoc(teammateRegRef, cleanedTeammateReg);
+                registeredCountInc++;
+              }
+            }
+          }
+        } catch (teamErr) {
+          console.error("Failed to add some teammates due to permissions or other error:", teamErr);
+          // Do not fail the primary registration
+        }
+      }
+
       // Increment registeredCount on the event document
       const eventRef = doc(db, 'posts', eventId);
       await updateDoc(eventRef, {
-        registeredCount: increment(1)
+        registeredCount: increment(registeredCountInc)
       });
 
       set({ isRegistered: true });

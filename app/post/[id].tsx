@@ -56,12 +56,7 @@ export default function PostDetailScreen() {
   let regStatusMessage = 'Register for Event';
   let isRegActive = post?.registrationOpen !== false;
 
-  const hasOtherRegistration = !isRegistered && userTickets.length > 0;
-
-  if (hasOtherRegistration) {
-    isRegActive = false;
-    regStatusMessage = 'Registered for Another Event';
-  } else if (post?.type === 'event' && post.registrationStartDate && post.registrationEndDate) {
+  if (post?.type === 'event' && post.registrationStartDate && post.registrationEndDate) {
     const now = Date.now();
     if (now < post.registrationStartDate) {
       isRegActive = false;
@@ -190,6 +185,24 @@ export default function PostDetailScreen() {
                   <Text style={[styles.eventDetailText, { fontWeight: 'bold', marginBottom: 4 }]}>Rules & Requirements:</Text>
                   <Text style={[styles.eventDetailText, { lineHeight: 20 }]}>{post.rules}</Text>
                 </View>
+              )}
+              {post.pdfUrl && (
+                <TouchableOpacity
+                  style={styles.pdfDownloadBtn}
+                  onPress={() => Linking.openURL(post.pdfUrl!)}
+                >
+                  <Ionicons name="document-text" size={20} color="#fff" />
+                  <Text style={styles.pdfDownloadText}>Download Guidelines PDF</Text>
+                </TouchableOpacity>
+              )}
+              {post.websiteUrl && (
+                <TouchableOpacity
+                  style={[styles.pdfDownloadBtn, { backgroundColor: Colors.info, marginTop: Spacing.sm }]}
+                  onPress={() => Linking.openURL(post.websiteUrl!)}
+                >
+                  <Ionicons name="globe-outline" size={20} color="#fff" />
+                  <Text style={styles.pdfDownloadText}>Visit External Website</Text>
+                </TouchableOpacity>
               )}
             </View>
           )}
@@ -376,6 +389,22 @@ const styles = StyleSheet.create({
   chatBtnText: {
     color: '#fff',
     fontSize: FontSize.md,
+    fontWeight: 'bold',
+  },
+  pdfDownloadBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.primary,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    marginTop: Spacing.md,
+    alignSelf: 'flex-start',
+    gap: 8,
+  },
+  pdfDownloadText: {
+    color: '#fff',
+    fontSize: FontSize.sm,
     fontWeight: 'bold',
   },
 });

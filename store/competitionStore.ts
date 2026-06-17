@@ -58,6 +58,8 @@ export const useCompetitionStore = create<CompetitionStore>((set, get) => ({
         summary: eventData.summary || eventData.content?.substring(0, 100) + '...' || '',
         content: eventData.content || '',
         imageUrl: eventData.imageUrl,
+        pdfUrl: eventData.pdfUrl,
+        websiteUrl: eventData.websiteUrl,
         author: profile.organizationName || profile.displayName || 'Unknown Organizer',
         authorId: user.uid,
         branch: profile.ieeeSection || 'all',
@@ -74,6 +76,7 @@ export const useCompetitionStore = create<CompetitionStore>((set, get) => ({
         category: eventData.category || 'General',
         eventStatus: eventData.eventStatus || 'upcoming',
         registeredCount: 0,
+        registrationConfig: eventData.registrationConfig || {},
       };
 
       await setDoc(newDocRef, newPost);

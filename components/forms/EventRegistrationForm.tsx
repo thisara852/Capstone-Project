@@ -28,6 +28,8 @@ interface EventRegistrationFormProps {
     requiresResume?: boolean;
     requiresIeeeProof?: boolean;
     customQuestions?: string[];
+    isTeamEvent?: boolean;
+    maxTeamSize?: number;
   };
   visible: boolean;
   onClose: () => void;
@@ -59,9 +61,23 @@ export const EventRegistrationForm: React.FC<EventRegistrationFormProps> = ({
 
   const [customAnswers, setCustomAnswers] = useState<Record<string, string>>({});
   
+  // Team Feature state
+  const isTeamEventConfig = registrationConfig?.isTeamEvent || isTeamEvent;
+  const maxTeamSize = registrationConfig?.maxTeamSize || 1;
+  const hasTeamDetails = isTeamEventConfig && maxTeamSize > 1;
+  const numAdditionalMembers = hasTeamDetails ? maxTeamSize - 1 : 0;
+
+  const [teamName, setTeamName] = useState('');
+  const [teamMemberEmails, setTeamMemberEmails] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (numAdditionalMembers > 0 && teamMemberEmails.length !== numAdditionalMembers) {
+      setTeamMemberEmails(Array(numAdditionalMembers).fill(''));
+    }
+  }, [numAdditionalMembers]);
+  
   const [resume, setResume] = useState<{ uri: string, name: string, type: string } | null>(null);
   const [studentIdCard, setStudentIdCard] = useState<{ uri: string, name: string, type: string } | null>(null);
-  const [ieeeProof, setIeeeProof] = useState<{ uri: string, name: string, type: string } | null>(null);
 
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
@@ -78,13 +94,43 @@ export const EventRegistrationForm: React.FC<EventRegistrationFormProps> = ({
     }
   }, [visible, profile]);
 
+  const activeSteps = ['personal'];
+  if (hasTeamDetails) activeSteps.push('team');
+  if (registrationConfig?.customQuestions && registrationConfig.customQuestions.length > 0) activeSteps.push('questions');
+  
+  const needsStudentId = !profile?.verificationDocuments?.idDocument;
+  const hasDocuments = needsStudentId || registrationConfig?.requiresResume;
+  if (hasDocuments) activeSteps.push('documents');
+  
+  activeSteps.push('review');
+
+  const currentStepId = activeSteps[step - 1];
+  const totalSteps = activeSteps.length;
+
   const validateCurrentStep = () => {
     setFormErrors({});
     try {
-      if (step === 1) {
+      if (currentStepId === 'personal') {
         registrationSchema.parse(formData);
-      } else if (step === 2 && registrationConfig?.customQuestions) {
-        // Validate custom questions
+      } else if (currentStepId === 'team') {
+        let isValid = true;
+        const errors: Record<string, string> = {};
+        if (!teamName.trim()) {
+          errors.teamName = 'Team name is required';
+          isValid = false;
+        }
+        // Emails are optional, but if provided they should be validish
+        teamMemberEmails.forEach((email, idx) => {
+          if (email.trim() && !email.includes('@')) {
+            errors[`member_${idx}`] = 'Invalid email address';
+            isValid = false;
+          }
+        });
+        if (!isValid) {
+          setFormErrors(errors);
+          return false;
+        }
+      } else if (currentStepId === 'questions' && registrationConfig?.customQuestions) {
         let isValid = true;
         const errors: Record<string, string> = {};
         registrationConfig.customQuestions.forEach(q => {
@@ -97,22 +143,16 @@ export const EventRegistrationForm: React.FC<EventRegistrationFormProps> = ({
           setFormErrors(errors);
           return false;
         }
-      } else if (step === 3) {
+      } else if (currentStepId === 'documents') {
         let isValid = true;
         const errors: Record<string, string> = {};
         
-        const needsStudentId = !profile?.verificationDocuments?.idDocument;
-
         if (needsStudentId && !studentIdCard) {
           errors.studentId = 'Student ID document is required.';
           isValid = false;
         }
         if (registrationConfig?.requiresResume && !resume) {
           errors.resume = 'Resume is required.';
-          isValid = false;
-        }
-        if (registrationConfig?.requiresIeeeProof && !ieeeProof) {
-          errors.ieeeProof = 'IEEE Membership proof is required.';
           isValid = false;
         }
         if (!isValid) {
@@ -190,17 +230,13 @@ export const EventRegistrationForm: React.FC<EventRegistrationFormProps> = ({
           type: resume.type
         };
       }
-      if (ieeeProof?.uri) {
-        uploadedFiles.ieeeProof = {
-          url: await uploadFileToCloudinary(ieeeProof.uri, ieeeProof.type === 'pdf'),
-          type: ieeeProof.type
-        };
-      }
 
       const registrationDataPayload: any = {
         eventId,
         userId: profile?.uid || '',
         ...formData,
+        teamName: hasTeamDetails ? teamName : undefined,
+        teamMemberEmails: hasTeamDetails ? teamMemberEmails.filter(e => e.trim().length > 0) : undefined,
         registrationData: customAnswers,
         registrationStatus: 'pending' as const, // Always pending by default
       };
@@ -219,21 +255,10 @@ export const EventRegistrationForm: React.FC<EventRegistrationFormProps> = ({
     }
   };
 
-  // Determine total steps dynamically
-  const hasCustomQuestions = registrationConfig?.customQuestions && registrationConfig.customQuestions.length > 0;
-  const needsStudentId = !profile?.verificationDocuments?.idDocument;
-  const hasDocuments = needsStudentId || registrationConfig?.requiresResume || registrationConfig?.requiresIeeeProof;
-  
-  // Dynamic step mapping
-  let currentActualStep = step;
-  if (step === 2 && !hasCustomQuestions) currentActualStep = 3;
-  if (currentActualStep === 3 && !hasDocuments) currentActualStep = 4; // Skip to Review
-
   const renderStepIndicator = () => {
-    const totalSteps = 1 + (hasCustomQuestions ? 1 : 0) + (hasDocuments ? 1 : 0) + 1; // Base + Questions + Docs + Review
     return (
       <Text style={styles.stepIndicatorText}>
-        Step {step > totalSteps ? totalSteps : step} of {totalSteps}
+        Step {step} of {totalSteps}
       </Text>
     );
   };
@@ -280,7 +305,7 @@ export const EventRegistrationForm: React.FC<EventRegistrationFormProps> = ({
           )}
 
           {/* STEP 1: Personal Details */}
-          {!isSuccess && step === 1 && (
+          {!isSuccess && currentStepId === 'personal' && (
             <View>
               <View style={styles.infoBox}>
                 <Ionicons name="information-circle-outline" size={24} color={Colors.primary} />
@@ -297,8 +322,43 @@ export const EventRegistrationForm: React.FC<EventRegistrationFormProps> = ({
             </View>
           )}
 
-          {/* STEP 2: Custom Questions (if any) */}
-          {currentActualStep === 2 && hasCustomQuestions && (
+          {/* TEAM DETAILS */}
+          {!isSuccess && currentStepId === 'team' && (
+            <View>
+              <Text style={styles.stepTitle}>Team Details</Text>
+              <Text style={styles.stepSubtitle}>Register up to {maxTeamSize} members.</Text>
+              
+              <FormInput 
+                label="Team Name *" 
+                value={teamName} 
+                onChangeText={setTeamName} 
+                error={formErrors.teamName} 
+                icon="people-outline" 
+              />
+              
+              <Text style={[styles.stepSubtitle, { marginTop: Spacing.md }]}>Add Teammates (Enter their exact account email)</Text>
+              {teamMemberEmails.map((email, idx) => (
+                <FormInput
+                  key={idx}
+                  label={`Member ${idx + 2} Email`}
+                  placeholder="e.g., friend@example.com"
+                  value={email}
+                  onChangeText={(text) => {
+                    const newEmails = [...teamMemberEmails];
+                    newEmails[idx] = text;
+                    setTeamMemberEmails(newEmails);
+                  }}
+                  error={formErrors[`member_${idx}`]}
+                  icon="mail-outline"
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                />
+              ))}
+            </View>
+          )}
+
+          {/* CUSTOM QUESTIONS */}
+          {!isSuccess && currentStepId === 'questions' && (
             <View>
               <Text style={styles.stepTitle}>Additional Questions</Text>
               <Text style={styles.stepSubtitle}>The organizer requires the following information.</Text>
@@ -317,8 +377,8 @@ export const EventRegistrationForm: React.FC<EventRegistrationFormProps> = ({
             </View>
           )}
 
-          {/* STEP 3: Documents (if any) */}
-          {currentActualStep === 3 && hasDocuments && (
+          {/* DOCUMENTS */}
+          {!isSuccess && currentStepId === 'documents' && (
             <View>
               <Text style={styles.stepTitle}>Verification Documents</Text>
               <Text style={styles.stepSubtitle}>Please upload the required files to proceed.</Text>
@@ -347,22 +407,11 @@ export const EventRegistrationForm: React.FC<EventRegistrationFormProps> = ({
                   </TouchableOpacity>
                 </View>
               )}
-
-              {registrationConfig?.requiresIeeeProof && (
-                <View style={styles.uploadSection}>
-                  <Text style={styles.uploadLabel}>IEEE Membership Proof *</Text>
-                  {formErrors.ieeeProof && <Text style={styles.fieldErrorText}>{formErrors.ieeeProof}</Text>}
-                  <TouchableOpacity style={styles.uploadBox} onPress={() => pickDocument(setIeeeProof)}>
-                    <Ionicons name={ieeeProof ? "document-text" : "cloud-upload-outline"} size={32} color={ieeeProof ? Colors.primary : Colors.textMuted} />
-                    <Text style={styles.uploadBoxText}>{ieeeProof ? ieeeProof.name : 'Tap to upload IEEE Proof'}</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
             </View>
           )}
 
-          {/* STEP 4: Review & Submit */}
-          {currentActualStep >= 4 && (
+          {/* REVIEW */}
+          {!isSuccess && currentStepId === 'review' && (
             <View>
               <Text style={styles.stepTitle}>Review Registration</Text>
               <Text style={styles.stepSubtitle}>Ensure all details are correct before submitting.</Text>
@@ -372,6 +421,14 @@ export const EventRegistrationForm: React.FC<EventRegistrationFormProps> = ({
                 <Text style={styles.reviewValue}>{formData.fullName} ({formData.studentId})</Text>
                 <Text style={styles.reviewLabel}>University:</Text>
                 <Text style={styles.reviewValue}>{formData.university}</Text>
+                {hasTeamDetails && (
+                  <>
+                    <Text style={styles.reviewLabel}>Team Name:</Text>
+                    <Text style={styles.reviewValue}>{teamName}</Text>
+                    <Text style={styles.reviewLabel}>Team Members:</Text>
+                    <Text style={styles.reviewValue}>{teamMemberEmails.filter(e => e.trim().length > 0).join(', ') || 'None added'}</Text>
+                  </>
+                )}
               </View>
 
               <View style={styles.infoBox}>
@@ -385,7 +442,7 @@ export const EventRegistrationForm: React.FC<EventRegistrationFormProps> = ({
 
           {!isSuccess && (
             <View style={styles.footerActions}>
-              {currentActualStep >= 4 ? (
+              {currentStepId === 'review' ? (
                 <FormButton
                   label="Submit Registration"
                   onPress={handleSubmit}
