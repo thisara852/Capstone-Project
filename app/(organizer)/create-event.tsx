@@ -8,7 +8,6 @@ import { Colors, Spacing, BorderRadius, FontSize, FontWeight } from '../../const
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import * as DocumentPicker from 'expo-document-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { uploadFileToCloudinary } from '../../utils/cloudinary';
 import { format } from 'date-fns';
@@ -21,13 +20,8 @@ export default function CreateEventScreen() {
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
   const [imageUrl, setImageUrl] = useState('');
-  const [websiteUrl, setWebsiteUrl] = useState('');
   const [localImageUri, setLocalImageUri] = useState<string | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
-  
-  const [localPdfUri, setLocalPdfUri] = useState<string | null>(null);
-  const [pdfName, setPdfName] = useState<string>('');
-  const [isUploadingPdf, setIsUploadingPdf] = useState(false);
   
   const [eventDate, setEventDate] = useState(new Date());
   const [showEventDatePicker, setShowEventDatePicker] = useState(false);
@@ -47,8 +41,6 @@ export default function CreateEventScreen() {
   const [requiresResume, setRequiresResume] = useState(false);
   const [requiresIeeeProof, setRequiresIeeeProof] = useState(false);
   const [customQuestionsInput, setCustomQuestionsInput] = useState('');
-  const [isTeamEvent, setIsTeamEvent] = useState(false);
-  const [maxTeamSize, setMaxTeamSize] = useState('');
 
   const EVENT_CATEGORIES = ['Hackathon', 'Coding Challenge', 'Workshop', 'Seminar', 'Conference', 'Other'];
 
@@ -97,9 +89,7 @@ export default function CreateEventScreen() {
     }
 
     setIsUploadingImage(true);
-    setIsUploadingPdf(true);
     let finalImageUrl = imageUrl.trim();
-    let finalPdfUrl = '';
 
     try {
       // If user selected a local image, upload to Cloudinary first
@@ -109,18 +99,6 @@ export default function CreateEventScreen() {
         } catch (uploadErr: any) {
           Alert.alert('Upload Failed', uploadErr.message || 'Failed to upload image to Cloudinary. Ensure your keys are set.');
           setIsUploadingImage(false);
-          setIsUploadingPdf(false);
-          return;
-        }
-      }
-
-      if (localPdfUri) {
-        try {
-          finalPdfUrl = await uploadFileToCloudinary(localPdfUri, true);
-        } catch (uploadErr: any) {
-          Alert.alert('Upload Failed', uploadErr.message || 'Failed to upload PDF to Cloudinary.');
-          setIsUploadingImage(false);
-          setIsUploadingPdf(false);
           return;
         }
       }
@@ -130,8 +108,6 @@ export default function CreateEventScreen() {
         content: description.trim(),
         eventLocation: location.trim(),
         imageUrl: finalImageUrl || undefined,
-        pdfUrl: finalPdfUrl || undefined,
-        websiteUrl: websiteUrl.trim() || undefined,
         tags: selectedTags,
         eventDate: eventDate.getTime(),
         registrationStartDate: regStartDate.getTime(),
@@ -145,8 +121,6 @@ export default function CreateEventScreen() {
           requiresResume,
           requiresIeeeProof,
           customQuestions: customQuestionsInput.split(',').map(q => q.trim()).filter(Boolean),
-          isTeamEvent,
-          maxTeamSize: isTeamEvent && maxTeamSize ? parseInt(maxTeamSize, 10) : undefined,
         }
       });
       
@@ -163,7 +137,6 @@ export default function CreateEventScreen() {
       Alert.alert('Error', error.message || 'Failed to save event. Please check your permissions.');
     } finally {
       setIsUploadingImage(false);
-      setIsUploadingPdf(false);
     }
   };
 
@@ -178,22 +151,6 @@ export default function CreateEventScreen() {
     if (!result.canceled && result.assets && result.assets.length > 0) {
       setLocalImageUri(result.assets[0].uri);
       setImageUrl(''); // Clear manual URL if they pick a file
-    }
-  };
-
-  const pickPdf = async () => {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: 'application/pdf',
-        copyToCacheDirectory: true,
-      });
-
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        setLocalPdfUri(result.assets[0].uri);
-        setPdfName(result.assets[0].name);
-      }
-    } catch (err) {
-      console.error('Error picking document:', err);
     }
   };
 
@@ -344,7 +301,7 @@ export default function CreateEventScreen() {
           )}
         </TouchableOpacity>
         
-        <Text style={[styles.label, { marginTop: Spacing.sm }]}>Or paste an Image Web URL instead:</Text>
+        <Text style={[styles.label, { marginTop: Spacing.sm }]}>Or paste a Web URL instead:</Text>
         <TextInput
           style={styles.input}
           placeholder="https://images.unsplash.com/..."
@@ -355,16 +312,6 @@ export default function CreateEventScreen() {
             if (text) setLocalImageUri(null); // Clear local selection if they type a URL
           }}
           editable={!isLoading && !isUploadingImage}
-        />
-
-        <Text style={styles.label}>External Website Link (Optional)</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="e.g., https://my-event.com"
-          placeholderTextColor={Colors.textMuted}
-          value={websiteUrl}
-          onChangeText={setWebsiteUrl}
-          editable={!isLoading}
         />
 
         <Text style={styles.label}>Participant Limit (Optional)</Text>
@@ -403,19 +350,6 @@ export default function CreateEventScreen() {
           textAlignVertical="top"
           editable={!isLoading}
         />
-
-        <Text style={styles.label}>Guidelines / Rulebook PDF (Optional)</Text>
-        <TouchableOpacity style={styles.pdfPicker} onPress={pickPdf} disabled={isLoading || isUploadingPdf}>
-          <Ionicons name="document-text-outline" size={24} color={localPdfUri ? Colors.success : Colors.textMuted} />
-          <Text style={[styles.pdfPickerText, localPdfUri && { color: Colors.success, fontWeight: 'bold' }]}>
-            {localPdfUri ? pdfName : 'Tap to upload a PDF rulebook'}
-          </Text>
-          {localPdfUri && (
-            <TouchableOpacity onPress={() => { setLocalPdfUri(null); setPdfName(''); }}>
-              <Ionicons name="close-circle" size={20} color={Colors.error} style={{ marginLeft: 8 }} />
-            </TouchableOpacity>
-          )}
-        </TouchableOpacity>
 
         <Text style={styles.label}>Tags (Select at least 1) *</Text>
         <View style={styles.topicsGrid}>
@@ -464,35 +398,15 @@ export default function CreateEventScreen() {
           editable={!isLoading}
         />
 
-        <View style={styles.switchRow}>
-          <Text style={styles.switchLabel}>Is this a Team Event?</Text>
-          <Switch value={isTeamEvent} onValueChange={setIsTeamEvent} trackColor={{ true: Colors.primary, false: Colors.border }} />
-        </View>
-
-        {isTeamEvent && (
-          <>
-            <Text style={[styles.label, { marginTop: Spacing.sm }]}>Maximum Team Size *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g., 4"
-              placeholderTextColor={Colors.textMuted}
-              value={maxTeamSize}
-              onChangeText={setMaxTeamSize}
-              keyboardType="numeric"
-              editable={!isLoading}
-            />
-          </>
-        )}
-
         <TouchableOpacity 
-          style={[styles.submitButton, (isLoading || isUploadingImage || isUploadingPdf) && styles.submitButtonDisabled]} 
+          style={[styles.submitButton, (isLoading || isUploadingImage) && styles.submitButtonDisabled]} 
           onPress={handleCreate}
-          disabled={isLoading || isUploadingImage || isUploadingPdf}
+          disabled={isLoading || isUploadingImage}
         >
-          {isLoading || isUploadingImage || isUploadingPdf ? (
+          {isLoading || isUploadingImage ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <ActivityIndicator color={Colors.textPrimary} />
-              <Text style={styles.submitButtonText}>{isUploadingImage ? 'Uploading Image...' : isUploadingPdf ? 'Uploading PDF...' : 'Saving Event...'}</Text>
+              <Text style={styles.submitButtonText}>{isUploadingImage ? 'Uploading Image...' : 'Saving Event...'}</Text>
             </View>
           ) : (
             <Text style={styles.submitButtonText}>Submit Competition</Text>
@@ -657,7 +571,7 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   submitButtonText: {
-    color: '#FFFFFF',
+    color: Colors.textPrimary,
     fontSize: FontSize.lg,
     fontWeight: FontWeight.bold,
   },
@@ -701,22 +615,5 @@ const styles = StyleSheet.create({
   switchLabel: {
     color: Colors.textPrimary,
     fontSize: FontSize.sm,
-  },
-  pdfPicker: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.bgSurface,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderStyle: 'dashed',
-    marginBottom: Spacing.lg,
-  },
-  pdfPickerText: {
-    color: Colors.textMuted,
-    fontSize: FontSize.sm,
-    flex: 1,
-    marginLeft: Spacing.sm,
   },
 });

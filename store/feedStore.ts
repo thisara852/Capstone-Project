@@ -29,8 +29,6 @@ export interface Post {
   summary: string;
   content: string;
   imageUrl?: string;
-  pdfUrl?: string;
-  websiteUrl?: string;
   author: string;
   authorId: string;
   branch: string;
@@ -60,8 +58,6 @@ export interface Post {
     requiresResume?: boolean;
     requiresIeeeProof?: boolean;
     customQuestions?: string[];
-    isTeamEvent?: boolean;
-    maxTeamSize?: number;
   };
 }
 
@@ -98,7 +94,6 @@ interface FeedStore {
   fetchIEEENews: (topic?: string) => Promise<void>;
   toggleLike: (postId: string, userId: string) => Promise<void>;
   createPost: (post: Omit<Post, 'id'>) => Promise<string>;
-  deletePost: (postId: string) => Promise<void>;
   seedDatabase: () => Promise<void>;
   fetchComments: (postId: string) => () => void;
   addComment: (postId: string, text: string) => Promise<void>;
@@ -356,19 +351,6 @@ export const useFeedStore = create<FeedStore>()(
     } catch (err) {
       console.error('Failed to create post', err);
       return `local-${Date.now()}`;
-    }
-  },
-
-  deletePost: async (postId: string) => {
-    try {
-      await deleteDoc(doc(db, 'posts', postId));
-      
-      // Update local state to remove the post immediately
-      const { posts } = get();
-      set({ posts: posts.filter(p => p.id !== postId) });
-    } catch (err: any) {
-      console.error('Failed to delete post:', err);
-      throw new Error(err.message || 'Failed to delete post');
     }
   },
 

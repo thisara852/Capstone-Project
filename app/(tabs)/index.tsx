@@ -132,7 +132,17 @@ export default function FeedScreen() {
             </View>
           </Animated.View>
 
-
+          {/* NLP Banner */}
+          {profile?.interests && profile.interests.length > 0 && (
+            <Animated.View style={[styles.nlpBanner, { opacity: headerOpacity }]}>
+              <Ionicons name="sparkles" size={14} color={Colors.accent} />
+              <Text style={styles.nlpText}>
+                Personalized for your interests in{' '}
+                <Text style={{ color: Colors.accent }}>{profile.interests[0]}</Text>
+                {profile.interests.length > 1 ? ` +${profile.interests.length - 1} more` : ''}
+              </Text>
+            </Animated.View>
+          )}
         </View>
 
         {/* Filter Tabs (Sticky Section) */}

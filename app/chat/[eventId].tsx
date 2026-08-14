@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   View, Text, StyleSheet, TextInput, TouchableOpacity, 
   FlatList, KeyboardAvoidingView, Platform, Alert, ActivityIndicator, Image,
-  Modal, TouchableWithoutFeedback, ImageBackground, Share
+  Modal, TouchableWithoutFeedback, ImageBackground
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,13 +12,11 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as MediaLibrary from 'expo-media-library';
-import * as Clipboard from 'expo-clipboard';
 
 import { useChatStore, ChatMessage } from '../../store/chatStore';
 import { useUserStore } from '../../store/userStore';
 import { useFeedStore } from '../../store/feedStore';
 import { useCompetitionStore } from '../../store/competitionStore';
-import { useRegistrationStore } from '../../store/registrationStore';
 import { uploadFileToCloudinary } from '../../utils/cloudinary';
 import { Colors, Spacing, BorderRadius, FontSize, FontWeight } from '../../constants/theme';
 import { format } from 'date-fns';
@@ -36,7 +34,7 @@ export default function EventChatScreen() {
   const insets = useSafeAreaInsets();
 
   const { user, profile } = useUserStore();
-  const { posts, deletePost } = useFeedStore();
+  const { posts } = useFeedStore();
   const { myCompetitions } = useCompetitionStore();
   
   const { messages, isLoading, subscribeToChat, sendMessage, deleteMessage, cleanup } = useChatStore();
@@ -45,99 +43,6 @@ export default function EventChatScreen() {
   const isCreatorOrganizer = event && user?.uid === event.authorId;
   const isAdmin = profile?.role === 'admin';
   const canModerate = isCreatorOrganizer || isAdmin;
-  const isSupportChat = eventId.startsWith('support_');
-
-  const { registrations, fetchEventRegistrations, updateRegistrationStatus } = useRegistrationStore();
-  const [isGroupInfoVisible, setIsGroupInfoVisible] = useState(false);
-  const [isRemovingMember, setIsRemovingMember] = useState<string | null>(null);
-  const [isLeaving, setIsLeaving] = useState(false);
-
-  useEffect(() => {
-    if (eventId && !isSupportChat) {
-      fetchEventRegistrations(eventId);
-    }
-  }, [eventId]);
-
-  const chatMembers = registrations.filter(r => r.status === 'approved' || r.status === 'checked-in');
-
-  const getHeaderSubtitle = () => {
-    if (isSupportChat) return 'Admin Assistant';
-    if (chatMembers.length > 0) {
-      const names = [];
-      const hasOrganizer = chatMembers.some(m => m.userId === event?.authorId);
-      if (!hasOrganizer && event?.author) {
-        names.push(event.authorId === user?.uid ? 'You' : event.author);
-      }
-      chatMembers.forEach(m => {
-        names.push(m.userId === user?.uid ? 'You' : m.userDisplayName);
-      });
-      return names.join(', ');
-    }
-    return 'Group Chat';
-  };
-
-  const handleRemoveMember = (memberUserId: string, displayName: string) => {
-    Alert.alert(
-      'Remove Member',
-      `Are you sure you want to remove ${displayName} from this event chat? This will reject their ticket.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Remove', 
-          style: 'destructive', 
-          onPress: async () => {
-            setIsRemovingMember(memberUserId);
-            try {
-              await updateRegistrationStatus(eventId, memberUserId, 'rejected');
-            } catch (err: any) {
-              Alert.alert('Error', err.message || 'Failed to remove member');
-            } finally {
-              setIsRemovingMember(null);
-            }
-          }
-        }
-      ]
-    );
-  };
-
-  const handleLeaveGroup = () => {
-    Alert.alert('Leave Event Chat', `Are you sure you want to leave ${event?.title}? This will cancel your ticket.`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Leave', style: 'destructive', onPress: async () => {
-          if (!user) return;
-          setIsLeaving(true);
-          try {
-            await updateRegistrationStatus(eventId, user.uid, 'rejected');
-            setIsGroupInfoVisible(false);
-            router.replace('/(tabs)/groups');
-          } catch (err: any) {
-            Alert.alert('Error', err.message);
-            setIsLeaving(false);
-          }
-        }
-      }
-    ]);
-  };
-
-  const handleDeleteEvent = () => {
-    Alert.alert('Delete Event', `Are you sure you want to permanently delete "${event?.title}"? This will remove the event from the feed, cancel all tickets, and delete this chat.`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete Event', style: 'destructive', onPress: async () => {
-          setIsLeaving(true);
-          try {
-            await deletePost(eventId);
-            setIsGroupInfoVisible(false);
-            router.replace('/(tabs)/groups');
-          } catch (err: any) {
-            Alert.alert('Error', err.message);
-            setIsLeaving(false);
-          }
-        }
-      }
-    ]);
-  };
 
   useEffect(() => {
     if (eventId) {
@@ -282,27 +187,6 @@ export default function EventChatScreen() {
         fileType: selectedFile?.type,
         fileSize: selectedFile?.size
       });
-
-      // Broadcast Notification for Announcements
-      if (isAnnouncement && event) {
-        try {
-          const { useNotificationStore } = await import('../../store/notificationStore');
-          
-          const notificationPromises = chatMembers
-            .filter(m => m.userId !== user?.uid)
-            .map(m => useNotificationStore.getState().createDirectNotification(
-              m.userId,
-              `Announcement: ${event.title}`,
-              messageText ? messageText.substring(0, 100) : 'An organizer has sent a new announcement.',
-              'system',
-              eventId as string
-            ));
-            
-          await Promise.all(notificationPromises);
-        } catch (notifErr) {
-          console.error("Failed to broadcast announcement notification", notifErr);
-        }
-      }
       
       setMessageText('');
       setSelectedFile(null);
@@ -449,33 +333,11 @@ export default function EventChatScreen() {
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
         </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.headerTitleContainer} 
-          onPress={() => { if (!isSupportChat) setIsGroupInfoVisible(true); }}
-          disabled={isSupportChat}
-        >
-          <Text style={styles.headerTitle} numberOfLines={1}>{isSupportChat ? 'Live Support' : event?.title || 'Chat'}</Text>
-          <Text style={styles.headerSubtitle} numberOfLines={1}>{getHeaderSubtitle()}</Text>
-        </TouchableOpacity>
-        
-        {isCreatorOrganizer && !isSupportChat ? (
-          <TouchableOpacity 
-            style={styles.backBtn}
-            onPress={async () => {
-              try {
-                const link = `https://compconnect.app/post/${eventId}`;
-                await Clipboard.setStringAsync(link);
-                Alert.alert('Link Copied!', 'The link to this group/event has been copied to your clipboard. You can now share it with others.');
-              } catch (err) {
-                console.error('Failed to copy link', err);
-              }
-            }}
-          >
-            <Ionicons name="link-outline" size={24} color={Colors.primary} />
-          </TouchableOpacity>
-        ) : (
-          <View style={{ width: 40 }} />
-        )}
+        <View style={styles.headerTitleContainer}>
+          <Text style={styles.headerTitle} numberOfLines={1}>{eventId.startsWith('support_') ? 'Live Support' : event?.title || 'Chat'}</Text>
+          <Text style={styles.headerSubtitle}>{eventId.startsWith('support_') ? 'Admin Assistant' : 'Group Chat'}</Text>
+        </View>
+        <View style={{ width: 40 }} />
       </View>
 
       <KeyboardAvoidingView 
@@ -631,116 +493,6 @@ export default function EventChatScreen() {
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
-      </Modal>
-
-      {/* Event Info / Members Modal */}
-      <Modal 
-        visible={isGroupInfoVisible} 
-        animationType="slide" 
-        transparent={true}
-        onRequestClose={() => setIsGroupInfoVisible(false)}
-      >
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
-          <SafeAreaView style={[{ backgroundColor: Colors.bgDark, flex: 0, height: '80%', borderTopLeftRadius: 20, borderTopRightRadius: 20, overflow: 'hidden' }]} edges={['top']}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: Spacing.md, borderBottomWidth: 1, borderBottomColor: Colors.border }}>
-              <Text style={{ fontSize: FontSize.lg, fontWeight: 'bold', color: Colors.textPrimary }}>Event Members</Text>
-              <TouchableOpacity onPress={() => setIsGroupInfoVisible(false)} style={{ padding: 4 }}>
-                <Ionicons name="close" size={24} color={Colors.textPrimary} />
-              </TouchableOpacity>
-            </View>
-            
-            <FlatList
-              data={chatMembers}
-              keyExtractor={(item) => item.userId}
-              contentContainerStyle={{ padding: Spacing.md, paddingBottom: 40 }}
-              ListHeaderComponent={() => {
-                const hasOrganizer = chatMembers.some(m => m.userId === event?.authorId);
-                return (
-                  <View style={{ marginBottom: Spacing.md }}>
-                    <Text style={{ fontSize: FontSize.lg, fontWeight: 'bold', color: Colors.textPrimary, marginBottom: Spacing.sm }}>Members ({chatMembers.length + (hasOrganizer ? 0 : 1)})</Text>
-                    
-                    {!hasOrganizer && event && (
-                      <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.bgCard, padding: Spacing.md, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: Colors.border, marginBottom: Spacing.sm }}>
-                        <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center', marginRight: Spacing.md }}>
-                          <Text style={{ color: '#fff', fontSize: FontSize.md, fontWeight: 'bold' }}>{event.author.charAt(0).toUpperCase()}</Text>
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <Text style={{ color: Colors.textPrimary, fontSize: FontSize.base, fontWeight: '600' }}>{event.author}</Text>
-                          <Text style={{ color: Colors.textMuted, fontSize: FontSize.sm, textTransform: 'capitalize' }}>Organizer</Text>
-                        </View>
-                      </View>
-                    )}
-                  </View>
-                );
-              }}
-              renderItem={({ item }) => (
-                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.bgCard, padding: Spacing.md, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: Colors.border, marginBottom: Spacing.sm }}>
-                  {item.userAvatar ? (
-                    <Image source={{ uri: item.userAvatar }} style={{ width: 40, height: 40, borderRadius: 20, marginRight: Spacing.md }} />
-                  ) : (
-                    <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center', marginRight: Spacing.md }}>
-                      <Text style={{ color: '#fff', fontSize: FontSize.md, fontWeight: 'bold' }}>{item.userDisplayName.charAt(0).toUpperCase()}</Text>
-                    </View>
-                  )}
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: Colors.textPrimary, fontSize: FontSize.base, fontWeight: '600' }}>{item.userDisplayName}</Text>
-                    <Text style={{ color: Colors.textMuted, fontSize: FontSize.sm, textTransform: 'capitalize' }}>Attendee</Text>
-                  </View>
-                  {canModerate && item.userId !== user?.uid && (
-                    <TouchableOpacity 
-                      style={{ padding: 8, backgroundColor: 'rgba(239, 68, 68, 0.1)', borderRadius: BorderRadius.sm }}
-                      onPress={() => handleRemoveMember(item.userId, item.userDisplayName)}
-                      disabled={isRemovingMember === item.userId}
-                    >
-                      {isRemovingMember === item.userId ? (
-                        <ActivityIndicator size="small" color={Colors.error} />
-                      ) : (
-                        <Ionicons name="trash-outline" size={18} color={Colors.error} />
-                      )}
-                    </TouchableOpacity>
-                  )}
-                </View>
-              )}
-              ListFooterComponent={() => {
-                const isAttendee = chatMembers.some(m => m.userId === user?.uid);
-                
-                return (
-                  <View style={{ marginTop: Spacing.xl, gap: Spacing.md }}>
-                    {isAttendee && (
-                      <TouchableOpacity 
-                        style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: Spacing.md, backgroundColor: 'rgba(239, 68, 68, 0.1)', borderRadius: BorderRadius.md, borderWidth: 1, borderColor: Colors.error }} 
-                        onPress={handleLeaveGroup} 
-                        disabled={isLeaving}
-                      >
-                        {isLeaving ? <ActivityIndicator size="small" color={Colors.error} /> : (
-                          <>
-                            <Ionicons name="log-out-outline" size={20} color={Colors.error} />
-                            <Text style={{ color: Colors.error, fontSize: FontSize.md, fontWeight: 'bold' }}>Leave Chat & Cancel Ticket</Text>
-                          </>
-                        )}
-                      </TouchableOpacity>
-                    )}
-
-                    {isCreatorOrganizer && (
-                      <TouchableOpacity 
-                        style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: Spacing.md, backgroundColor: Colors.error, borderRadius: BorderRadius.md }} 
-                        onPress={handleDeleteEvent} 
-                        disabled={isLeaving}
-                      >
-                        {isLeaving ? <ActivityIndicator size="small" color="#fff" /> : (
-                          <>
-                            <Ionicons name="trash-outline" size={20} color="#fff" />
-                            <Text style={{ color: '#fff', fontSize: FontSize.md, fontWeight: 'bold' }}>Delete Entire Event</Text>
-                          </>
-                        )}
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                );
-              }}
-            />
-          </SafeAreaView>
-        </View>
       </Modal>
     </SafeAreaView>
   );

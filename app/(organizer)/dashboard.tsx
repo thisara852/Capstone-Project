@@ -64,7 +64,7 @@ export default function OrganizerDashboard() {
                       styles.miniStatusText,
                       { color: event.eventStatus === 'upcoming' ? Colors.warning : Colors.success }
                     ]}>
-                      {event.eventStatus?.toUpperCase() ?? ''}
+                      {event.eventStatus?.toUpperCase()}
                     </Text>
                   </View>
                 </View>

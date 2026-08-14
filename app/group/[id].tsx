@@ -24,74 +24,15 @@ import { uploadFileToCloudinary } from '../../utils/cloudinary';
 
 export default function GroupProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { currentGroup, getGroupDetails, myGroups, joinGroup, leaveGroup, deleteGroup, updateGroup, fetchGroupMembers, removeMember } = useGroupStore();
+  const { currentGroup, getGroupDetails, myGroups, joinGroup, leaveGroup, deleteGroup, updateGroup } = useGroupStore();
   const { user, profile } = useUserStore();
   const [isLoading, setIsLoading] = useState(true);
   const [isJoining, setIsJoining] = useState(false);
-
+  
   const [isEditingDesc, setIsEditingDesc] = useState(false);
   const [newDesc, setNewDesc] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
-
-  // Expiry details helper
-  const getExpiryText = () => {
-    if (!currentGroup?.expiresAt) return null;
-    const remainingMs = currentGroup.expiresAt - Date.now();
-    if (remainingMs <= 0) return 'Expired';
-    
-    const remainingHours = Math.ceil(remainingMs / (1000 * 60 * 60));
-    if (remainingHours < 24) {
-      return `Expires in ${remainingHours} ${remainingHours === 1 ? 'hour' : 'hours'}`;
-    }
-    const remainingDays = Math.ceil(remainingHours / 24);
-    return `Expires in ${remainingDays} ${remainingDays === 1 ? 'day' : 'days'}`;
-  };
-
-  // Tabs segment selection
-  const [activeTab, setActiveTab] = useState<'about' | 'members'>('about');
-  const [members, setMembers] = useState<any[]>([]);
-  const [isFetchingMembers, setIsFetchingMembers] = useState(false);
-  const [isRemovingMember, setIsRemovingMember] = useState<string | null>(null);
-
-  const loadMembers = async () => {
-    setIsFetchingMembers(true);
-    const fetched = await fetchGroupMembers(id);
-    setMembers(fetched);
-    setIsFetchingMembers(false);
-  };
-
-  useEffect(() => {
-    if (activeTab === 'members') {
-      loadMembers();
-    }
-  }, [id, activeTab]);
-
-  const handleRemoveMember = (memberId: string, displayName: string) => {
-    Alert.alert(
-      'Remove Member',
-      `Are you sure you want to remove ${displayName} from the community?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Remove', 
-          style: 'destructive', 
-          onPress: async () => {
-            if (!user) return;
-            setIsRemovingMember(memberId);
-            try {
-              await removeMember(id, memberId, user.uid);
-              await loadMembers();
-            } catch (err: any) {
-              Alert.alert('Error', err.message || 'Failed to remove member');
-            } finally {
-              setIsRemovingMember(null);
-            }
-          }
-        }
-      ]
-    );
-  };
 
   useEffect(() => {
     const loadData = async () => {
@@ -123,38 +64,34 @@ export default function GroupProfileScreen() {
   const handleLeave = () => {
     Alert.alert('Leave Community', `Are you sure you want to leave ${currentGroup?.name}?`, [
       { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Leave', style: 'destructive', onPress: async () => {
-          if (!user) return;
-          setIsJoining(true);
-          try {
-            await leaveGroup(id, user.uid);
-            router.back();
-          } catch (err: any) {
-            Alert.alert('Error', err.message);
-          } finally {
-            setIsJoining(false);
-          }
+      { text: 'Leave', style: 'destructive', onPress: async () => {
+        if (!user) return;
+        setIsJoining(true);
+        try {
+          await leaveGroup(id, user.uid);
+          router.back();
+        } catch (err: any) {
+          Alert.alert('Error', err.message);
+        } finally {
+          setIsJoining(false);
         }
-      }
+      }}
     ]);
   };
 
   const handleDelete = () => {
     Alert.alert('Delete Community', 'This action is irreversible. Delete this community?', [
       { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete', style: 'destructive', onPress: async () => {
-          setIsJoining(true);
-          try {
-            await deleteGroup(id);
-            router.replace('/(tabs)/groups');
-          } catch (err: any) {
-            Alert.alert('Error', err.message);
-            setIsJoining(false);
-          }
+      { text: 'Delete', style: 'destructive', onPress: async () => {
+        setIsJoining(true);
+        try {
+          await deleteGroup(id);
+          router.replace('/(tabs)/groups');
+        } catch (err: any) {
+          Alert.alert('Error', err.message);
+          setIsJoining(false);
         }
-      }
+      }}
     ]);
   };
 
@@ -162,10 +99,10 @@ export default function GroupProfileScreen() {
     if (!currentGroup) return;
     try {
       const inviteLink = `ieeecompconnect://group/${id}`;
-      const message = currentGroup.visibility === 'private'
+      const message = currentGroup.visibility === 'private' 
         ? `You've been invited to a private community: ${currentGroup.name}! Use this exclusive link to join: ${inviteLink}`
         : `Check out ${currentGroup.name} on IEEE CompConnect! Join here: ${inviteLink}`;
-
+        
       await Share.share({
         message,
         url: inviteLink, // iOS uses URL field
@@ -244,209 +181,141 @@ export default function GroupProfileScreen() {
               style={[styles.banner, { opacity: 0.85 }]}
             />
           )}
-          
-          {currentGroup.expiresAt && (
-            <View style={styles.expiryBadge}>
-              <Ionicons name="time-outline" size={16} color="#fff" />
-              <Text style={styles.expiryText}>{getExpiryText()}</Text>
-            </View>
-          )}
         </View>
 
         <View style={styles.content}>
           {/* Avatar & Title */}
           <View style={styles.topSection}>
-            <TouchableOpacity
-              style={styles.avatarWrap}
-              activeOpacity={isOwner ? 0.7 : 1}
-              onPress={isOwner ? handleChangeAvatar : undefined}
-            >
-              {isUploadingAvatar ? (
-                <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                  <ActivityIndicator size="small" color="#fff" />
-                </View>
-              ) : currentGroup.avatar ? (
-                <Image source={{ uri: currentGroup.avatar }} style={styles.avatar} />
-              ) : (
-                <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                  <Text style={styles.avatarText}>{currentGroup.name.charAt(0).toUpperCase()}</Text>
-                </View>
-              )}
-
-              {isOwner && (
-                <View style={styles.editAvatarBadge}>
-                  <Ionicons name="camera" size={14} color="#fff" />
-                </View>
-              )}
-            </TouchableOpacity>
-
-            <Text style={styles.title}>
-              {currentGroup.name} {currentGroup.verified && <Ionicons name="checkmark-circle" size={20} color={Colors.primary} />}
-              {currentGroup.visibility === 'private' && <Ionicons name="lock-closed" size={18} color={Colors.textMuted} style={{ marginLeft: 8 }} />}
-            </Text>
-            <Text style={styles.category}>{currentGroup.category} • {currentGroup.type === 'event' ? 'Event Group' : 'Circle'}</Text>
-
-            <View style={styles.statsRow}>
-              <View style={styles.statItem}>
-                <Ionicons name="people" size={16} color={Colors.textSecondary} />
-                <Text style={styles.statText}>{currentGroup.memberCount} Members</Text>
+          <TouchableOpacity 
+            style={styles.avatarWrap} 
+            activeOpacity={isOwner ? 0.7 : 1}
+            onPress={isOwner ? handleChangeAvatar : undefined}
+          >
+            {isUploadingAvatar ? (
+              <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                <ActivityIndicator size="small" color="#fff" />
               </View>
-              <View style={styles.statItem}>
-                <Ionicons name="calendar" size={16} color={Colors.textSecondary} />
-                <Text style={styles.statText}>Est. {format(currentGroup.createdAt, 'MMM yyyy')}</Text>
+            ) : currentGroup.avatar ? (
+              <Image source={{ uri: currentGroup.avatar }} style={styles.avatar} />
+            ) : (
+              <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                <Text style={styles.avatarText}>{currentGroup.name.charAt(0).toUpperCase()}</Text>
               </View>
+            )}
+            
+            {isOwner && (
+              <View style={styles.editAvatarBadge}>
+                <Ionicons name="camera" size={14} color="#fff" />
+              </View>
+            )}
+          </TouchableOpacity>
+          
+          <Text style={styles.title}>
+            {currentGroup.name} {currentGroup.verified && <Ionicons name="checkmark-circle" size={20} color={Colors.primary} />}
+            {currentGroup.visibility === 'private' && <Ionicons name="lock-closed" size={18} color={Colors.textMuted} style={{marginLeft: 8}} />}
+          </Text>
+          <Text style={styles.category}>{currentGroup.category} • {currentGroup.type === 'event' ? 'Event Group' : 'Circle'}</Text>
+          
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <Ionicons name="people" size={16} color={Colors.textSecondary} />
+              <Text style={styles.statText}>{currentGroup.memberCount} Members</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Ionicons name="calendar" size={16} color={Colors.textSecondary} />
+              <Text style={styles.statText}>Est. {format(currentGroup.createdAt, 'MMM yyyy')}</Text>
             </View>
           </View>
+        </View>
 
-          {/* Action Button */}
-          <View style={styles.actionContainer}>
-            {isMember ? (
-              <View style={styles.memberActions}>
-                <TouchableOpacity
-                  style={styles.chatBtn}
-                  onPress={() => router.push(`/group/${id}/chat`)}
-                >
-                  <Ionicons name="chatbubbles" size={20} color="#fff" />
-                  <Text style={styles.chatBtnText}>Enter Chat</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.leaveBtnIcon, { backgroundColor: Colors.primary + '22', borderColor: Colors.primary }]}
-                  onPress={handleShare}
-                >
-                  <Ionicons name="share-social" size={24} color={Colors.primary} />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.leaveBtnIcon} onPress={handleLeave}>
-                  <Ionicons name="log-out-outline" size={24} color={Colors.error} />
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <TouchableOpacity
-                style={styles.joinBtn}
-                onPress={handleJoin}
-                disabled={isJoining}
+        {/* Action Button */}
+        <View style={styles.actionContainer}>
+          {isMember ? (
+            <View style={styles.memberActions}>
+              <TouchableOpacity 
+                style={styles.chatBtn}
+                onPress={() => router.push(`/group/${id}/chat`)}
               >
-                {isJoining ? (
-                  <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <Text style={styles.joinBtnText}>Join Community</Text>
-                )}
+                <Ionicons name="chatbubbles" size={20} color="#fff" />
+                <Text style={styles.chatBtnText}>Enter Chat</Text>
               </TouchableOpacity>
-            )}
-          </View>
-
-          {/* Tabs */}
-          <View style={styles.tabsContainer}>
-            <TouchableOpacity 
-              style={[styles.tabBtn, activeTab === 'about' && styles.tabBtnActive]} 
-              onPress={() => setActiveTab('about')}
-            >
-              <Text style={[styles.tabText, activeTab === 'about' && styles.tabTextActive]}>About</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.tabBtn, activeTab === 'members' && styles.tabBtnActive]} 
-              onPress={() => setActiveTab('members')}
-            >
-              <Text style={[styles.tabText, activeTab === 'members' && styles.tabTextActive]}>Members</Text>
-            </TouchableOpacity>
-          </View>
-
-          {activeTab === 'about' ? (
-            <View style={styles.section}>
-              <View style={styles.sectionHeaderRow}>
-                <Text style={styles.sectionTitle}>About</Text>
-                {isOwner && !isEditingDesc && (
-                  <TouchableOpacity onPress={() => {
-                    setNewDesc(currentGroup.description);
-                    setIsEditingDesc(true);
-                  }}>
-                    <Ionicons name="pencil" size={18} color={Colors.primary} />
-                  </TouchableOpacity>
-                )}
-              </View>
-
-              {isEditingDesc ? (
-                <View style={styles.editDescContainer}>
-                  <TextInput
-                    style={styles.descInput}
-                    multiline
-                    value={newDesc}
-                    onChangeText={setNewDesc}
-                    placeholder="Write a description for your community..."
-                    placeholderTextColor={Colors.textMuted}
-                    autoFocus
-                  />
-                  <View style={styles.editDescActions}>
-                    <TouchableOpacity
-                      style={[styles.editBtn, styles.editBtnCancel]}
-                      onPress={() => setIsEditingDesc(false)}
-                      disabled={isUpdating}
-                    >
-                      <Text style={styles.editBtnCancelText}>Cancel</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.editBtn, styles.editBtnSave]}
-                      onPress={handleSaveDescription}
-                      disabled={isUpdating}
-                    >
-                      {isUpdating ? (
-                        <ActivityIndicator size="small" color="#fff" />
-                      ) : (
-                        <Text style={styles.editBtnSaveText}>Save</Text>
-                      )}
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ) : (
-                <Text style={styles.description}>{currentGroup.description}</Text>
-              )}
+              <TouchableOpacity 
+                style={[styles.leaveBtnIcon, { backgroundColor: Colors.primary + '22', borderColor: Colors.primary }]} 
+                onPress={handleShare}
+              >
+                <Ionicons name="share-social" size={24} color={Colors.primary} />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.leaveBtnIcon} onPress={handleLeave}>
+                <Ionicons name="log-out-outline" size={24} color={Colors.error} />
+              </TouchableOpacity>
             </View>
           ) : (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Members ({members.length})</Text>
-              {isFetchingMembers ? (
-                <ActivityIndicator size="small" color={Colors.primary} style={{ marginTop: 20 }} />
-              ) : members.length === 0 ? (
-                <Text style={styles.emptyText}>No members found.</Text>
+            <TouchableOpacity 
+              style={styles.joinBtn} 
+              onPress={handleJoin}
+              disabled={isJoining}
+            >
+              {isJoining ? (
+                <ActivityIndicator color="#fff" size="small" />
               ) : (
-                <View style={styles.membersList}>
-                  {members.map(member => (
-                    <View key={member.userId} style={styles.memberCard}>
-                      {member.photoURL ? (
-                        <Image source={{ uri: member.photoURL }} style={styles.memberAvatar} />
-                      ) : (
-                        <View style={styles.memberAvatarPlaceholder}>
-                          <Text style={styles.memberAvatarText}>{member.displayName.charAt(0).toUpperCase()}</Text>
-                        </View>
-                      )}
-                      
-                      <View style={styles.memberInfo}>
-                        <Text style={styles.memberName}>
-                          {member.displayName} {member.role === 'owner' && <Ionicons name="star" size={12} color={Colors.primary} />}
-                        </Text>
-                        <Text style={styles.memberRole}>{member.role.charAt(0).toUpperCase() + member.role.slice(1)}</Text>
-                      </View>
-
-                      {isOwner && member.userId !== user?.uid && member.role !== 'owner' && (
-                        <TouchableOpacity 
-                          style={styles.removeMemberBtn}
-                          onPress={() => handleRemoveMember(member.userId, member.displayName)}
-                          disabled={isRemovingMember === member.userId}
-                        >
-                          {isRemovingMember === member.userId ? (
-                            <ActivityIndicator size="small" color={Colors.error} />
-                          ) : (
-                            <Ionicons name="trash-outline" size={18} color={Colors.error} />
-                          )}
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  ))}
-                </View>
+                <Text style={styles.joinBtnText}>Join Community</Text>
               )}
-            </View>
+            </TouchableOpacity>
           )}
         </View>
 
+        {/* Description */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>About</Text>
+            {isOwner && !isEditingDesc && (
+              <TouchableOpacity onPress={() => {
+                setNewDesc(currentGroup.description);
+                setIsEditingDesc(true);
+              }}>
+                <Ionicons name="pencil" size={18} color={Colors.primary} />
+              </TouchableOpacity>
+            )}
+          </View>
+          
+          {isEditingDesc ? (
+            <View style={styles.editDescContainer}>
+              <TextInput
+                style={styles.descInput}
+                multiline
+                value={newDesc}
+                onChangeText={setNewDesc}
+                placeholder="Write a description for your community..."
+                placeholderTextColor={Colors.textMuted}
+                autoFocus
+              />
+              <View style={styles.editDescActions}>
+                <TouchableOpacity 
+                  style={[styles.editBtn, styles.editBtnCancel]} 
+                  onPress={() => setIsEditingDesc(false)}
+                  disabled={isUpdating}
+                >
+                  <Text style={styles.editBtnCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.editBtn, styles.editBtnSave]} 
+                  onPress={handleSaveDescription}
+                  disabled={isUpdating}
+                >
+                  {isUpdating ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={styles.editBtnSaveText}>Save</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
+            <Text style={styles.description}>{currentGroup.description}</Text>
+          )}
+        </View>
+        </View>
+        
       </ScrollView>
     </View>
   );
@@ -455,13 +324,13 @@ export default function GroupProfileScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bgDark },
   loadingSafe: { flex: 1, backgroundColor: Colors.bgDark, justifyContent: 'center', alignItems: 'center' },
-
+  
   bannerContainer: { width: '100%', height: 200, position: 'relative' },
   banner: { width: '100%', height: '100%', position: 'absolute' },
-  headerSafe: {
+  headerSafe: { 
     position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10,
-    flexDirection: 'row', justifyContent: 'space-between',
-    paddingHorizontal: Spacing.md, paddingTop: 10
+    flexDirection: 'row', justifyContent: 'space-between', 
+    paddingHorizontal: Spacing.md, paddingTop: 10 
   },
   backBtn: {
     backgroundColor: 'rgba(0,0,0,0.5)', padding: 8, borderRadius: 20,
@@ -471,7 +340,7 @@ const styles = StyleSheet.create({
   },
 
   content: { padding: Spacing.lg },
-
+  
   topSection: { alignItems: 'center', marginTop: -60, marginBottom: Spacing.xl, zIndex: 5 },
   avatarWrap: {
     width: 100, height: 100, borderRadius: 50,
@@ -492,10 +361,10 @@ const styles = StyleSheet.create({
     borderRadius: 16, justifyContent: 'center', alignItems: 'center',
     borderWidth: 3, borderColor: Colors.bgDark, zIndex: 20
   },
-
+  
   title: { fontSize: FontSize.xxl, fontWeight: FontWeight.bold, color: Colors.textPrimary, textAlign: 'center', marginBottom: 4 },
   category: { fontSize: FontSize.sm, color: Colors.primary, fontWeight: '600', marginBottom: 12 },
-
+  
   statsRow: { flexDirection: 'row', gap: Spacing.xl },
   statItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   statText: { color: Colors.textSecondary, fontSize: FontSize.sm },
@@ -506,7 +375,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   joinBtnText: { color: '#fff', fontSize: FontSize.md, fontWeight: 'bold' },
-
+  
   memberActions: { flexDirection: 'row', gap: Spacing.md },
   chatBtn: {
     flex: 1, backgroundColor: Colors.primary, paddingVertical: 14, borderRadius: BorderRadius.md,
@@ -522,7 +391,7 @@ const styles = StyleSheet.create({
   sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.md },
   sectionTitle: { fontSize: FontSize.lg, fontWeight: 'bold', color: Colors.textPrimary },
   description: { fontSize: FontSize.base, color: Colors.textSecondary, lineHeight: 24 },
-
+  
   editDescContainer: { backgroundColor: Colors.bgCard, borderRadius: BorderRadius.md, padding: Spacing.sm, borderWidth: 1, borderColor: Colors.border },
   descInput: { color: Colors.textPrimary, fontSize: FontSize.base, minHeight: 80, textAlignVertical: 'top' },
   editDescActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: Spacing.sm, marginTop: Spacing.sm },
@@ -531,93 +400,4 @@ const styles = StyleSheet.create({
   editBtnSave: { backgroundColor: Colors.primary },
   editBtnCancelText: { color: Colors.textMuted, fontWeight: '600' },
   editBtnSaveText: { color: '#fff', fontWeight: 'bold' },
-
-  expiryBadge: {
-    position: 'absolute', bottom: 10, right: 10,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    paddingHorizontal: 12, paddingVertical: 6,
-    borderRadius: 20,
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-  },
-  expiryText: { color: '#fff', fontSize: FontSize.sm, fontWeight: '600' },
-
-  tabsContainer: {
-    flexDirection: 'row',
-    marginBottom: Spacing.xl,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  tabBtn: {
-    flex: 1,
-    paddingVertical: Spacing.sm,
-    alignItems: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
-  },
-  tabBtnActive: {
-    borderBottomColor: Colors.primary,
-  },
-  tabText: {
-    fontSize: FontSize.md,
-    color: Colors.textMuted,
-    fontWeight: '600',
-  },
-  tabTextActive: {
-    color: Colors.primary,
-  },
-  
-  emptyText: {
-    color: Colors.textMuted,
-    textAlign: 'center',
-    marginTop: Spacing.md,
-  },
-  membersList: {
-    marginTop: Spacing.md,
-    gap: Spacing.md,
-  },
-  memberCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.bgCard,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  memberAvatar: {
-    width: 40, height: 40,
-    borderRadius: 20,
-    marginRight: Spacing.md,
-  },
-  memberAvatarPlaceholder: {
-    width: 40, height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: Spacing.md,
-  },
-  memberAvatarText: {
-    color: '#fff',
-    fontSize: FontSize.md,
-    fontWeight: 'bold',
-  },
-  memberInfo: {
-    flex: 1,
-  },
-  memberName: {
-    color: Colors.textPrimary,
-    fontSize: FontSize.base,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  memberRole: {
-    color: Colors.textMuted,
-    fontSize: FontSize.sm,
-  },
-  removeMemberBtn: {
-    padding: 8,
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    borderRadius: BorderRadius.sm,
-  },
 });
