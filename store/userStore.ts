@@ -61,6 +61,8 @@ export interface UserProfile {
   organizationMemberships?: string[];
   // Organizer fields
   organizationName?: string;
+  organizationType?: string;
+  committeePosition?: string;
   ieeeSection?: string;
   organizationDescription?: string;
   verificationStatus?: 'pending' | 'verified' | 'rejected';
