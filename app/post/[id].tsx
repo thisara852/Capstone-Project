@@ -72,7 +72,7 @@ export default function PostDetailScreen() {
   const isCreatorOrganizer = post?.authorId === user?.uid;
   const isAdmin = profile?.role === 'admin';
   const isApprovedParticipant = currentRegistration?.status === 'approved' || currentRegistration?.status === 'checked-in';
-  const canAccessChat = post?.type === 'event' && !isAdmin && (isCreatorOrganizer || isApprovedParticipant);
+  const canAccessChat = post?.type === 'event' && (isCreatorOrganizer || isAdmin || isApprovedParticipant);
 
   if (!post) {
     return (
@@ -186,24 +186,6 @@ export default function PostDetailScreen() {
                   <Text style={[styles.eventDetailText, { lineHeight: 20 }]}>{post.rules}</Text>
                 </View>
               )}
-              {post.pdfUrl && (
-                <TouchableOpacity
-                  style={styles.pdfDownloadBtn}
-                  onPress={() => Linking.openURL(post.pdfUrl!)}
-                >
-                  <Ionicons name="document-text" size={20} color="#fff" />
-                  <Text style={styles.pdfDownloadText}>Download Guidelines PDF</Text>
-                </TouchableOpacity>
-              )}
-              {post.websiteUrl && (
-                <TouchableOpacity
-                  style={[styles.pdfDownloadBtn, { backgroundColor: Colors.info, marginTop: Spacing.sm }]}
-                  onPress={() => Linking.openURL(post.websiteUrl!)}
-                >
-                  <Ionicons name="globe-outline" size={20} color="#fff" />
-                  <Text style={styles.pdfDownloadText}>Visit External Website</Text>
-                </TouchableOpacity>
-              )}
             </View>
           )}
 
@@ -270,18 +252,24 @@ export default function PostDetailScreen() {
           {isRegistered ? (
             <View style={[
               styles.registerBtn,
-              { backgroundColor: currentRegistration?.status === 'pending' ? Colors.warning + '22' : Colors.success + '22' }
+              { backgroundColor: currentRegistration?.status === 'pending' ? Colors.warning + '22' : 
+                                 currentRegistration?.status === 'rejected' ? Colors.error + '22' : 
+                                 Colors.success + '22' }
             ]}>
               <Ionicons
-                name={currentRegistration?.status === 'pending' ? 'time' : 'checkmark-circle'}
+                name={currentRegistration?.status === 'pending' ? 'time' : 
+                      currentRegistration?.status === 'rejected' ? 'close-circle' : 'checkmark-circle'}
                 size={20}
-                color={currentRegistration?.status === 'pending' ? Colors.warning : Colors.success}
+                color={currentRegistration?.status === 'pending' ? Colors.warning : 
+                       currentRegistration?.status === 'rejected' ? Colors.error : Colors.success}
               />
               <Text style={[
                 styles.registerText,
-                { color: currentRegistration?.status === 'pending' ? Colors.warning : Colors.success }
+                { color: currentRegistration?.status === 'pending' ? Colors.warning : 
+                         currentRegistration?.status === 'rejected' ? Colors.error : Colors.success }
               ]}>
-                {currentRegistration?.status === 'pending' ? 'Pending Approval' : 'Registered'}
+                {currentRegistration?.status === 'pending' ? 'Pending Approval' : 
+                 currentRegistration?.status === 'rejected' ? 'Registration Rejected' : 'Registered'}
               </Text>
             </View>
           ) : (
@@ -389,22 +377,6 @@ const styles = StyleSheet.create({
   chatBtnText: {
     color: '#fff',
     fontSize: FontSize.md,
-    fontWeight: 'bold',
-  },
-  pdfDownloadBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.primary,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.md,
-    marginTop: Spacing.md,
-    alignSelf: 'flex-start',
-    gap: 8,
-  },
-  pdfDownloadText: {
-    color: '#fff',
-    fontSize: FontSize.sm,
     fontWeight: 'bold',
   },
 });

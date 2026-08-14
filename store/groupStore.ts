@@ -43,8 +43,6 @@ export interface Group {
   eventId?: string;
   lastMessageAt?: number;
   createdAt: number;
-  expiresAt?: number;
-  duration?: string;
 }
 
 export interface GroupMember {
@@ -85,8 +83,6 @@ interface GroupStore {
   leaveGroup: (groupId: string, userId: string) => Promise<void>;
   deleteGroup: (groupId: string) => Promise<void>;
   updateGroup: (groupId: string, data: Partial<Group>) => Promise<void>;
-  fetchGroupMembers: (groupId: string) => Promise<Array<{ userId: string; role: MemberRole; displayName: string; email: string; photoURL?: string }>>;
-  removeMember: (groupId: string, memberId: string, currentUserId: string) => Promise<void>;
 
   // Messaging
   subscribeToMessages: (groupId: string) => () => void;
@@ -108,7 +104,7 @@ export const useGroupStore = create<GroupStore>()(
       error: null,
 
       clearError: () => set({ error: null }),
-
+      
       cleanup: () => {
         set({ groups: [], myGroups: [], currentGroup: null, messages: {} });
       },
@@ -125,18 +121,7 @@ export const useGroupStore = create<GroupStore>()(
           const groups = snap.docs
             .map(d => ({ id: d.id, ...d.data() } as Group))
             .filter(g => g.visibility === 'public');
-          
-          const now = Date.now();
-          const validGroups = [];
-          for (const g of groups) {
-            if (g.expiresAt && g.expiresAt <= now) {
-              await deleteDoc(doc(db, 'groups', g.id));
-              continue;
-            }
-            validGroups.push(g);
-          }
-
-          set({ groups: validGroups, isLoading: false });
+          set({ groups, isLoading: false });
         } catch (err: any) {
           console.error("Fetch Groups Error:", err);
           set({ error: err.message, isLoading: false });
@@ -149,7 +134,7 @@ export const useGroupStore = create<GroupStore>()(
           const membersRef = collection(db, 'groupMembers');
           const q = query(membersRef, where('userId', '==', userId));
           const snap = await getDocs(q);
-
+          
           const myGroupIds = snap.docs.map(d => d.data().groupId);
           if (myGroupIds.length === 0) {
             set({ myGroups: [], isLoading: false });
@@ -162,7 +147,7 @@ export const useGroupStore = create<GroupStore>()(
           for (let i = 0; i < myGroupIds.length; i += 10) {
             chunks.push(myGroupIds.slice(i, i + 10));
           }
-
+          
           let myGroups: Group[] = [];
           for (const chunk of chunks) {
             const groupQ = query(collection(db, 'groups'), where('__name__', 'in', chunk));
@@ -170,17 +155,7 @@ export const useGroupStore = create<GroupStore>()(
             myGroups = [...myGroups, ...groupSnap.docs.map(d => ({ id: d.id, ...d.data() } as Group))];
           }
 
-          const now = Date.now();
-          const validMyGroups = [];
-          for (const g of myGroups) {
-            if (g.expiresAt && g.expiresAt <= now) {
-              await deleteDoc(doc(db, 'groups', g.id));
-              continue;
-            }
-            validMyGroups.push(g);
-          }
-
-          set({ myGroups: validMyGroups, isLoading: false });
+          set({ myGroups, isLoading: false });
         } catch (err: any) {
           console.error("Fetch My Groups Error:", err);
           set({ error: err.message, isLoading: false });
@@ -193,11 +168,6 @@ export const useGroupStore = create<GroupStore>()(
           const snap = await getDoc(docRef);
           if (snap.exists()) {
             const group = { id: snap.id, ...snap.data() } as Group;
-            if (group.expiresAt && group.expiresAt <= Date.now()) {
-              await deleteDoc(docRef);
-              set({ currentGroup: null, error: 'Group has expired' });
-              return null;
-            }
             set({ currentGroup: group });
             return group;
           }
@@ -220,7 +190,7 @@ export const useGroupStore = create<GroupStore>()(
           };
 
           const docRef = await addDoc(collection(db, 'groups'), newGroup);
-
+          
           const memberId = `${docRef.id}_${userId}`;
           await setDoc(doc(db, 'groupMembers', memberId), {
             id: memberId,
@@ -316,7 +286,7 @@ export const useGroupStore = create<GroupStore>()(
             id: d.id,
             ...d.data()
           } as GroupMessage));
-
+          
           set((state) => ({
             messages: {
               ...state.messages,
@@ -337,7 +307,7 @@ export const useGroupStore = create<GroupStore>()(
             createdAt: Date.now(),
           };
           await addDoc(collection(db, `groups/${groupId}/messages`), msg);
-
+          
           await updateDoc(doc(db, 'groups', groupId), {
             lastMessageAt: Date.now()
           });
@@ -354,62 +324,6 @@ export const useGroupStore = create<GroupStore>()(
             text: 'This message was deleted.',
             fileUrl: null
           });
-        } catch (err: any) {
-          set({ error: err.message });
-          throw err;
-        }
-      },
-
-      fetchGroupMembers: async (groupId) => {
-        try {
-          const membersRef = collection(db, 'groupMembers');
-          const q = query(membersRef, where('groupId', '==', groupId));
-          const snap = await getDocs(q);
-          const members = snap.docs.map(d => d.data());
-          if (members.length === 0) return [];
-
-          const userIds = members.map(m => m.userId);
-          const chunks = [];
-          for (let i = 0; i < userIds.length; i += 10) {
-            chunks.push(userIds.slice(i, i + 10));
-          }
-
-          let userProfiles: Record<string, any> = {};
-          for (const chunk of chunks) {
-            const userQ = query(collection(db, 'users'), where('__name__', 'in', chunk));
-            const userSnap = await getDocs(userQ);
-            userSnap.docs.forEach(doc => {
-              userProfiles[doc.id] = doc.data();
-            });
-          }
-
-          return members.map(m => ({
-            userId: m.userId,
-            role: m.role as MemberRole,
-            displayName: userProfiles[m.userId]?.displayName || 'Unknown User',
-            email: userProfiles[m.userId]?.email || '',
-            photoURL: userProfiles[m.userId]?.photoURL || null,
-          }));
-        } catch (err: any) {
-          console.error("Fetch Group Members Error:", err);
-          return [];
-        }
-      },
-
-      removeMember: async (groupId, memberId, currentUserId) => {
-        try {
-          const docId = `${groupId}_${memberId}`;
-          await deleteDoc(doc(db, 'groupMembers', docId));
-
-          await updateDoc(doc(db, 'groups', groupId), {
-            memberCount: increment(-1)
-          });
-
-          // Update local state if current group is loaded
-          const { currentGroup } = get();
-          if (currentGroup && currentGroup.id === groupId) {
-            set({ currentGroup: { ...currentGroup, memberCount: Math.max(1, (currentGroup.memberCount || 1) - 1) } });
-          }
         } catch (err: any) {
           set({ error: err.message });
           throw err;

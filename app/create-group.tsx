@@ -14,7 +14,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { useUserStore } from '../store/userStore';
 import { useGroupStore, GroupType, GroupVisibility } from '../store/groupStore';
 import { uploadFileToCloudinary } from '../utils/cloudinary';
@@ -35,41 +34,7 @@ export default function CreateGroupScreen() {
   const [visibility, setVisibility] = useState<GroupVisibility>('public');
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   
-  const [customDate, setCustomDate] = useState<Date>(new Date(Date.now() + 24 * 60 * 60 * 1000)); // Default 1 day
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showTimePicker, setShowTimePicker] = useState(false);
-  const [dateError, setDateError] = useState('');
-
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const onDateChange = (event: any, selectedDate?: Date) => {
-    setShowDatePicker(false);
-    if (selectedDate) {
-      const now = Date.now();
-      if (selectedDate.getTime() <= now) {
-        const msg = 'Expiration date must be in the future.';
-        setDateError(msg);
-        Alert.alert('Validation Error', msg);
-        return;
-      }
-      const newDate = new Date(customDate);
-      selectedDate.setHours(newDate.getHours());
-      selectedDate.setMinutes(newDate.getMinutes());
-      setCustomDate(selectedDate);
-      setDateError('');
-      setShowTimePicker(true);
-    }
-  };
-
-  const onTimeChange = (event: any, selectedTime?: Date) => {
-    setShowTimePicker(false);
-    if (selectedTime) {
-      const newDate = new Date(customDate);
-      newDate.setHours(selectedTime.getHours());
-      newDate.setMinutes(selectedTime.getMinutes());
-      setCustomDate(newDate);
-    }
-  };
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -90,10 +55,7 @@ export default function CreateGroupScreen() {
       return;
     }
     if (!user) return;
-    if (dateError) {
-      Alert.alert('Validation Error', dateError);
-      return;
-    }
+
     setIsSubmitting(true);
     try {
       let avatarUrl = undefined;
@@ -110,8 +72,6 @@ export default function CreateGroupScreen() {
         type: isOrganizer ? 'event' : 'circle', // By default, organizers create official communities
         verified: isOrganizer,
       };
-
-      groupPayload.expiresAt = customDate.getTime();
 
       if (avatarUrl) {
         groupPayload.avatar = avatarUrl;
@@ -140,7 +100,7 @@ export default function CreateGroupScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-
+        
         {/* Avatar Picker */}
         <View style={styles.avatarContainer}>
           <TouchableOpacity style={styles.avatarCircle} onPress={pickImage}>
@@ -203,15 +163,15 @@ export default function CreateGroupScreen() {
         <View style={styles.formGroup}>
           <Text style={styles.label}>Visibility</Text>
           <View style={styles.row}>
-            <TouchableOpacity
+            <TouchableOpacity 
               style={[styles.radioBtn, visibility === 'public' && styles.radioBtnActive]}
               onPress={() => setVisibility('public')}
             >
               <Ionicons name="globe-outline" size={20} color={visibility === 'public' ? Colors.primary : Colors.textMuted} />
               <Text style={[styles.radioText, visibility === 'public' && styles.radioTextActive]}>Public</Text>
             </TouchableOpacity>
-
-            <TouchableOpacity
+            
+            <TouchableOpacity 
               style={[styles.radioBtn, visibility === 'private' && styles.radioBtnActive]}
               onPress={() => setVisibility('private')}
             >
@@ -221,40 +181,8 @@ export default function CreateGroupScreen() {
           </View>
         </View>
 
-        {/* Duration / Expiration */}
-        <View style={styles.formGroup}>
-          <Text style={styles.label}>Auto Delete After Date</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
-            <TouchableOpacity 
-              style={styles.customDateBtn} 
-              onPress={() => setShowDatePicker(true)}
-            >
-              <Ionicons name="calendar-outline" size={20} color={Colors.primary} />
-              <Text style={styles.customDateText}>
-                {customDate.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.customDateBtn, { backgroundColor: Colors.bgSurface, borderColor: Colors.border }]} 
-              onPress={() => {
-                // Reset to default tomorrow
-                const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
-                setCustomDate(tomorrow);
-                setDateError('');
-              }}
-            >
-              <Ionicons name="close-circle" size={20} color={Colors.error} />
-              <Text style={styles.customDateText}>Clear</Text>
-            </TouchableOpacity>
-          </View>
-          {dateError ? <Text style={{ color: Colors.error, marginTop: 4, fontSize: FontSize.xs }}>{dateError}</Text> : null}
-          <View style={{ marginTop: 4 }}>
-            <Text style={{ color: Colors.textSecondary, fontSize: FontSize.sm }}>Selected expiration: {customDate.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</Text>
-          </View>
-        </View>
-
         <View style={styles.submitWrap}>
-          <FormButton
+          <FormButton 
             label={isOrganizer ? "Create Community" : "Create Circle"}
             onPress={handleCreate}
             isLoading={isSubmitting}
@@ -263,24 +191,6 @@ export default function CreateGroupScreen() {
         </View>
 
       </ScrollView>
-
-      {showDatePicker && (
-        <DateTimePicker
-          value={customDate}
-          mode="date"
-          display="default"
-          minimumDate={new Date()}
-          onChange={onDateChange}
-        />
-      )}
-      {showTimePicker && (
-        <DateTimePicker
-          value={customDate}
-          mode="time"
-          display="default"
-          onChange={onTimeChange}
-        />
-      )}
     </SafeAreaView>
   );
 }
@@ -298,7 +208,7 @@ const styles = StyleSheet.create({
   },
   backBtn: { padding: 4 },
   headerTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.textPrimary },
-
+  
   content: { padding: Spacing.xl },
 
   avatarContainer: { alignItems: 'center', marginBottom: Spacing.xl },
@@ -354,23 +264,6 @@ const styles = StyleSheet.create({
   radioBtnActive: { borderColor: Colors.primary, backgroundColor: Colors.primary + '11' },
   radioText: { color: Colors.textSecondary, fontWeight: '500' },
   radioTextActive: { color: Colors.primary },
-
-  customDateBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: Colors.bgCard,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.md,
-    marginTop: 4,
-  },
-  customDateText: {
-    color: Colors.textPrimary,
-    fontSize: FontSize.md,
-    fontWeight: '500',
-  },
 
   submitWrap: { marginTop: Spacing.xl, marginBottom: 40 },
 });

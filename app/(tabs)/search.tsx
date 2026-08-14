@@ -119,7 +119,9 @@ export default function SearchScreen() {
 
       {/* Tabs */}
       <View style={styles.tabs}>
-        {(['posts', 'communities', 'branches', 'news'] as const).map((tab) => (
+        {(['posts', 'communities', 'branches', 'news'] as const)
+          .filter((tab) => !(isAdmin && tab === 'communities'))
+          .map((tab) => (
             <TouchableOpacity
               key={tab}
               style={[styles.tab, activeTab === tab && styles.tabActive]}

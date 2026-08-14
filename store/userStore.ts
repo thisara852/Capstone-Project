@@ -50,7 +50,6 @@ export interface UserProfile {
   interests?: string[];
   joinedGroups?: string[];
   savedPostIds?: string[];
-  followedBranches?: string[];
   studentId?: string;
   github?: string;
   verificationDocuments?: {
@@ -100,7 +99,6 @@ interface UserStore {
   updateUserPassword: (currentPass: string, newPass: string) => Promise<void>;
   deactivateUserAccount: (password: string) => Promise<void>;
   toggleSavePost: (postId: string) => Promise<void>;
-  toggleFollowBranch: (branchId: string) => Promise<void>;
   fetchSavedPosts: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   initializeAuth: () => void;
@@ -392,43 +390,6 @@ export const useUserStore = create<UserStore>()(
       console.error("Failed to save post", err);
       // Revert on failure
       set({ profile: { ...profile, savedPostIds } });
-    }
-  },
-
-  toggleFollowBranch: async (branchId) => {
-    const { user, profile } = get();
-    if (!user || !profile) return;
-    
-    const followedBranches = profile.followedBranches || [];
-    const isFollowing = followedBranches.includes(branchId);
-    
-    // Optimistic update
-    const newFollowed = isFollowing 
-      ? followedBranches.filter(id => id !== branchId) 
-      : [...followedBranches, branchId];
-      
-    set({ profile: { ...profile, followedBranches: newFollowed } });
-    
-    try {
-      // Update User Profile
-      await updateDoc(doc(db, 'users', user.uid), {
-        followedBranches: isFollowing ? arrayRemove(branchId) : arrayUnion(branchId)
-      });
-    } catch (err) {
-      console.error("Failed to follow/unfollow branch in profile", err);
-      // Revert on failure
-      set({ profile: { ...profile, followedBranches } });
-      return; // Stop here if profile update failed
-    }
-
-    try {
-      // Try to update Branch follower count globally (might fail due to permissions)
-      const { increment, setDoc } = await import('firebase/firestore');
-      await setDoc(doc(db, 'branches', branchId), {
-        followerCount: increment(isFollowing ? -1 : 1)
-      }, { merge: true });
-    } catch (err) {
-      console.warn("Could not update global branch follower count (likely permission issue), but local profile was updated.");
     }
   },
 

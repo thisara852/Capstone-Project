@@ -26,14 +26,8 @@ export default function GroupChatScreen() {
   const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null);
   const [isAttachmentMenuVisible, setIsAttachmentMenuVisible] = useState(false);
   
-  const [isGroupInfoVisible, setIsGroupInfoVisible] = useState(false);
-  const [members, setMembers] = useState<any[]>([]);
-  const [isFetchingMembers, setIsFetchingMembers] = useState(false);
-  const [isRemovingMember, setIsRemovingMember] = useState<string | null>(null);
-  const [isLeaving, setIsLeaving] = useState(false);
-  
   const { user, profile } = useUserStore();
-  const { messages, currentGroup, subscribeToMessages, sendMessage, deleteMessage, getGroupDetails, fetchGroupMembers, removeMember, leaveGroup, myGroups } = useGroupStore();
+  const { messages, currentGroup, subscribeToMessages, sendMessage, deleteMessage, getGroupDetails } = useGroupStore();
   const insets = useSafeAreaInsets();
 
   const flatListRef = useRef<FlatList>(null);
@@ -50,72 +44,6 @@ export default function GroupChatScreen() {
   const isOwner = currentGroup?.createdBy === user?.uid;
   const isAdmin = profile?.role === 'admin';
   const canModerate = isOwner || isAdmin;
-
-  const loadMembers = async () => {
-    setIsFetchingMembers(true);
-    const fetched = await fetchGroupMembers(id);
-    setMembers(fetched);
-    setIsFetchingMembers(false);
-  };
-
-  useEffect(() => {
-    loadMembers();
-  }, [id]);
-
-  const getHeaderSubtitle = () => {
-    if (isFetchingMembers && members.length === 0) return 'Loading...';
-    if (members.length > 0) {
-      const names = members.map(m => m.userId === user?.uid ? 'You' : m.displayName);
-      return names.join(', ');
-    }
-    return `${currentGroup?.memberCount || 0} Members`;
-  };
-
-  const handleRemoveMember = (memberId: string, displayName: string) => {
-    Alert.alert(
-      'Remove Member',
-      `Are you sure you want to remove ${displayName} from the community?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Remove', 
-          style: 'destructive', 
-          onPress: async () => {
-            if (!user) return;
-            setIsRemovingMember(memberId);
-            try {
-              await removeMember(id, memberId, user.uid);
-              await loadMembers();
-            } catch (err: any) {
-              Alert.alert('Error', err.message || 'Failed to remove member');
-            } finally {
-              setIsRemovingMember(null);
-            }
-          }
-        }
-      ]
-    );
-  };
-
-  const handleLeaveGroup = () => {
-    Alert.alert('Leave Community', `Are you sure you want to leave ${currentGroup?.name}?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Leave', style: 'destructive', onPress: async () => {
-          if (!user) return;
-          setIsLeaving(true);
-          try {
-            await leaveGroup(id, user.uid);
-            setIsGroupInfoVisible(false);
-            router.replace('/(tabs)/groups');
-          } catch (err: any) {
-            Alert.alert('Error', err.message);
-            setIsLeaving(false);
-          }
-        }
-      }
-    ]);
-  };
 
   const pickImage = async () => {
     setIsAttachmentMenuVisible(false);
@@ -357,10 +285,10 @@ export default function GroupChatScreen() {
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.headerInfo} onPress={() => setIsGroupInfoVisible(true)}>
+        <View style={styles.headerInfo}>
           <Text style={styles.headerTitle} numberOfLines={1}>{currentGroup?.name || 'Loading...'}</Text>
-          <Text style={styles.headerSubtitle} numberOfLines={1}>{getHeaderSubtitle()}</Text>
-        </TouchableOpacity>
+          <Text style={styles.headerSubtitle}>{currentGroup?.memberCount || 0} Members</Text>
+        </View>
         <TouchableOpacity style={styles.infoBtn} onPress={() => router.push(`/group/${id}`)}>
           <Image 
             source={{ uri: currentGroup?.avatar || 'https://via.placeholder.com/150' }} 
@@ -476,81 +404,6 @@ export default function GroupChatScreen() {
           )}
         </View>
       </Modal>
-
-      {/* Group Info / Members Modal */}
-      <Modal 
-        visible={isGroupInfoVisible} 
-        animationType="slide" 
-        transparent={true}
-        onRequestClose={() => setIsGroupInfoVisible(false)}
-      >
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
-          <SafeAreaView style={[styles.modalSafe, { flex: 0, height: '80%', borderTopLeftRadius: 20, borderTopRightRadius: 20, overflow: 'hidden' }]} edges={['top']}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Group Info</Text>
-              <TouchableOpacity onPress={() => setIsGroupInfoVisible(false)} style={{ padding: 4 }}>
-                <Ionicons name="close" size={24} color={Colors.textPrimary} />
-              </TouchableOpacity>
-            </View>
-            
-            <FlatList
-              data={members}
-              keyExtractor={(item) => item.userId}
-              contentContainerStyle={{ padding: Spacing.md, paddingBottom: 40 }}
-              ListHeaderComponent={() => (
-                <View style={{ marginBottom: Spacing.md }}>
-                  <Text style={{ fontSize: FontSize.lg, fontWeight: 'bold', color: Colors.textPrimary, marginBottom: Spacing.sm }}>Members ({members.length})</Text>
-                  {isFetchingMembers && <ActivityIndicator size="small" color={Colors.primary} />}
-                </View>
-              )}
-              renderItem={({ item }) => (
-                <View style={styles.memberCard}>
-                  {item.photoURL ? (
-                    <Image source={{ uri: item.photoURL }} style={styles.memberAvatar} />
-                  ) : (
-                    <View style={styles.memberAvatarPlaceholder}>
-                      <Text style={styles.memberAvatarText}>{item.displayName.charAt(0).toUpperCase()}</Text>
-                    </View>
-                  )}
-                  <View style={styles.memberInfo}>
-                    <Text style={styles.memberName}>{item.displayName}</Text>
-                    <Text style={styles.memberRole}>{item.role}</Text>
-                  </View>
-                  {canModerate && item.userId !== user?.uid && item.role !== 'owner' && (
-                    <TouchableOpacity 
-                      style={styles.removeMemberBtn}
-                      onPress={() => handleRemoveMember(item.userId, item.displayName)}
-                      disabled={isRemovingMember === item.userId}
-                    >
-                      {isRemovingMember === item.userId ? (
-                        <ActivityIndicator size="small" color={Colors.error} />
-                      ) : (
-                        <Ionicons name="trash-outline" size={18} color={Colors.error} />
-                      )}
-                    </TouchableOpacity>
-                  )}
-                </View>
-              )}
-              ListFooterComponent={() => {
-                const isMember = myGroups.some(g => g.id === id);
-                if (isMember) {
-                  return (
-                    <TouchableOpacity style={styles.leaveGroupBtn} onPress={handleLeaveGroup} disabled={isLeaving}>
-                      {isLeaving ? <ActivityIndicator size="small" color={Colors.error} /> : (
-                        <>
-                          <Ionicons name="log-out-outline" size={20} color={Colors.error} />
-                          <Text style={styles.leaveGroupText}>Leave Group</Text>
-                        </>
-                      )}
-                    </TouchableOpacity>
-                  );
-                }
-                return null;
-              }}
-            />
-          </SafeAreaView>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 }
@@ -628,19 +481,4 @@ const styles = StyleSheet.create({
   fullScreenImgContainer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' },
   fullScreenClose: { position: 'absolute', top: 50, right: 20, zIndex: 10, padding: 8 },
   fullScreenImg: { width: '100%', height: '80%' },
-
-  // Modal styles
-  modalSafe: { flex: 1, backgroundColor: Colors.bgDark },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: Spacing.md, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  modalTitle: { fontSize: FontSize.lg, fontWeight: 'bold', color: Colors.textPrimary },
-  memberCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.bgCard, padding: Spacing.md, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: Colors.border, marginBottom: Spacing.sm },
-  memberAvatar: { width: 40, height: 40, borderRadius: 20, marginRight: Spacing.md },
-  memberAvatarPlaceholder: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center', marginRight: Spacing.md },
-  memberAvatarText: { color: '#fff', fontSize: FontSize.md, fontWeight: 'bold' },
-  memberInfo: { flex: 1 },
-  memberName: { color: Colors.textPrimary, fontSize: FontSize.base, fontWeight: '600' },
-  memberRole: { color: Colors.textMuted, fontSize: FontSize.sm, textTransform: 'capitalize' },
-  removeMemberBtn: { padding: 8, backgroundColor: 'rgba(239, 68, 68, 0.1)', borderRadius: BorderRadius.sm },
-  leaveGroupBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: Spacing.xl, padding: Spacing.md, backgroundColor: 'rgba(239, 68, 68, 0.1)', borderRadius: BorderRadius.md, borderWidth: 1, borderColor: Colors.error },
-  leaveGroupText: { color: Colors.error, fontSize: FontSize.md, fontWeight: 'bold' },
 });
