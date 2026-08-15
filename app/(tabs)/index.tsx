@@ -232,7 +232,7 @@ export default function FeedScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.bgDark },
+  safe: { flex: 1, backgroundColor: '#F8FAFC' },
 
   // Header Containers
   absoluteHeaderContainer: {
@@ -241,14 +241,22 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 10,
-    backgroundColor: Colors.bgDark, // Prevent posts from showing behind header
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    elevation: 3,
   },
   upperHeaderContainer: {
-    backgroundColor: Colors.bgDark,
+    backgroundColor: '#FFFFFF',
   },
   filterSection: {
-    backgroundColor: Colors.bgDark, // Base for the sticky part
+    backgroundColor: '#FFFFFF',
     paddingBottom: Spacing.sm,
+    paddingTop: 4,
   },
 
   header: {
@@ -256,93 +264,97 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.md,
+    paddingBottom: Spacing.sm,
   },
   greeting: {
-    color: Colors.textSecondary,
-    fontSize: FontSize.md,
+    color: '#1E3A8A',
+    fontSize: 14,
+    fontWeight: '600',
   },
   headerTitle: {
-    color: Colors.textPrimary,
-    fontSize: FontSize.xl,
-    fontWeight: FontWeight.extraBold,
+    color: '#1A73E8',
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: -0.4,
   },
   notifBtn: {
-    width: 42,
-    height: 42,
-    backgroundColor: Colors.bgCard,
-    borderRadius: 21,
+    width: 44,
+    height: 44,
+    backgroundColor: '#EFF6FF',
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: '#DBEAFE',
   },
   notifDot: {
     position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.error,
-    borderWidth: 1,
-    borderColor: Colors.bgDark,
+    top: 9,
+    right: 9,
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
+    backgroundColor: '#DC2626',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
   },
   nlpBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     marginHorizontal: Spacing.lg,
-    marginBottom: Spacing.md,
-    backgroundColor: Colors.accent + '11',
+    marginBottom: Spacing.sm,
+    backgroundColor: '#EFF6FF',
     borderWidth: 1,
-    borderColor: Colors.accent + '33',
+    borderColor: '#BFDBFE',
     borderRadius: BorderRadius.md,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
   nlpText: {
-    color: Colors.textSecondary,
-    fontSize: FontSize.sm,
+    color: '#1E3A8A',
+    fontSize: 13,
+    fontWeight: '500',
   },
 
   // Filter Tabs
   filterScroll: {
     paddingHorizontal: Spacing.md,
-    gap: 8,
+    gap: 10,
     alignItems: 'center',
   },
   filterChip: {
-    borderRadius: 16, // Small modern squircle
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: Colors.borderLight,
-    backgroundColor: Colors.bgCard,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F1F5F9',
     overflow: 'hidden',
   },
   filterChipActive: {
     borderColor: 'transparent',
-    shadowColor: Colors.primary,
+    shadowColor: '#1A73E8',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 6,
-    elevation: 6,
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   filterGradient: {
-    borderRadius: 16,
+    borderRadius: 20,
   },
   filterInner: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: 18,
+    paddingVertical: 9,
     justifyContent: 'center',
     alignItems: 'center',
   },
   filterText: {
-    color: Colors.textSecondary,
-    fontSize: 13,
-    fontWeight: FontWeight.semiBold,
+    color: '#1E3A8A',
+    fontSize: 14,
+    fontWeight: '600',
   },
   filterTextActive: {
-    color: '#fff',
+    color: '#FFFFFF',
+    fontWeight: '700',
   },
 
   listContent: {
@@ -353,7 +365,8 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   emptyText: {
-    color: Colors.textMuted,
+    color: '#64748B',
     fontSize: FontSize.lg,
+    fontWeight: '600',
   },
 });
