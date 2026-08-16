@@ -69,12 +69,24 @@ export const useAdminStore = create<AdminStore>((set, get) => ({
         where('role', '==', 'organizer')
       );
       const unsubscribe = onSnapshot(q, (snap) => {
-        const orgs = snap.docs.map(d => d.data() as UserProfile);
-        // Sort: pending first
+        const orgs = snap.docs.map(d => {
+          const data = d.data();
+          return {
+            uid: d.id,
+            ...data,
+            createdAt: data.createdAt?.toMillis ? data.createdAt.toMillis() : (data.createdAt || 0),
+            updatedAt: data.updatedAt?.toMillis ? data.updatedAt.toMillis() : (data.updatedAt || 0),
+          } as unknown as UserProfile;
+        });
+        // Sort: pending first, then newest
         orgs.sort((a, b) => {
-          if (a.verificationStatus === 'pending' && b.verificationStatus !== 'pending') return -1;
-          if (a.verificationStatus !== 'pending' && b.verificationStatus === 'pending') return 1;
-          return 0;
+          const aPending = a.verificationStatus === 'pending' || !a.verificationStatus;
+          const bPending = b.verificationStatus === 'pending' || !b.verificationStatus;
+          if (aPending && !bPending) return -1;
+          if (!aPending && bPending) return 1;
+          const timeA = a.updatedAt || a.createdAt || 0;
+          const timeB = b.updatedAt || b.createdAt || 0;
+          return timeB - timeA;
         });
         set({ organizers: orgs, isLoading: false });
       }, (err) => {
@@ -158,7 +170,11 @@ export const useAdminStore = create<AdminStore>((set, get) => ({
 
   updateOrganizerStatus: async (userId, status) => {
     try {
-      await updateDoc(doc(db, 'users', userId), { verificationStatus: status });
+      await updateDoc(doc(db, 'users', userId), { 
+        verificationStatus: status,
+        verified: status === 'verified',
+        updatedAt: Date.now(),
+      });
       
       // NOTIFICATION TRIGGER
       if (status === 'verified') {

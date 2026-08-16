@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, Modal, ScrollView, KeyboardAvoidingView, Platform, Linking, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useUserStore, UserProfile } from '../../store/userStore';
 import { useAdminStore } from '../../store/adminStore';
 import { Post } from '../../store/feedStore';
@@ -27,16 +28,23 @@ export default function AdminHistory() {
   } = useAdminStore();
 
   const [activeTab, setActiveTab] = useState<Tab>('organizers');
+  const [selectedOrganizer, setSelectedOrganizer] = useState<UserProfile | null>(null);
 
-  const historyOrganizers = organizers.filter(o => o.verificationStatus !== 'pending');
-  const historyEvents = events.filter(e => e.status !== 'pending');
+  const historyOrganizers = organizers
+    .filter(o => o.verificationStatus === 'verified' || o.verificationStatus === 'rejected')
+    .sort((a, b) => {
+      const timeA = a.updatedAt || a.createdAt || 0;
+      const timeB = b.updatedAt || b.createdAt || 0;
+      return timeB - timeA;
+    });
+
+  const historyEvents = events
+    .filter(e => e.status === 'approved' || e.status === 'rejected')
+    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
   useEffect(() => {
     fetchOrganizers();
     fetchEvents();
-    return () => {
-      cleanup();
-    };
   }, []);
 
   const handleOrganizerStatus = (user: UserProfile, status: 'verified' | 'rejected') => {
@@ -91,11 +99,15 @@ export default function AdminHistory() {
   };
 
   const renderOrganizer = ({ item }: { item: UserProfile }) => (
-    <View style={styles.card}>
+    <TouchableOpacity 
+      style={styles.card}
+      activeOpacity={0.7}
+      onPress={() => setSelectedOrganizer(item)}
+    >
       <View style={styles.cardHeader}>
         <View style={styles.cardHeaderLeft}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{item.displayName?.charAt(0).toUpperCase()}</Text>
+            <Text style={styles.avatarText}>{item.displayName?.charAt(0).toUpperCase() || 'O'}</Text>
           </View>
           <View>
             <Text style={styles.cardTitle}>{item.displayName}</Text>
@@ -111,15 +123,36 @@ export default function AdminHistory() {
       </View>
       
       <View style={styles.detailsBox}>
-        <Text style={styles.detailText}>🏢 {item.organizationName}</Text>
-        <Text style={styles.detailText}>🌐 Section: {item.ieeeSection}</Text>
-        {item.bio ? <Text style={styles.detailText} numberOfLines={2}>📝 {item.bio}</Text> : null}
+        {!!item.organizationName && <Text style={styles.detailText}>🏢 {item.organizationName}</Text>}
+        {!!(item.organizationType || item.ieeeSection) && (
+          <Text style={styles.detailText}>🌐 {item.organizationType ? `${item.organizationType} • ` : ''}{item.ieeeSection || ''}</Text>
+        )}
+        {!!(item.university || item.branch) && (
+          <Text style={styles.detailText}>🎓 {item.university || item.branch}</Text>
+        )}
+        {!!item.committeePosition && (
+          <Text style={styles.detailText}>👤 Position: {item.committeePosition}</Text>
+        )}
+        {!!(item.contactNumber || item.phoneNumber) && (
+          <Text style={styles.detailText}>📞 {item.contactNumber || item.phoneNumber}</Text>
+        )}
+        {!!(item.organizationDescription || item.bio) && (
+          <Text style={styles.detailText} numberOfLines={2}>📝 {item.organizationDescription || item.bio}</Text>
+        )}
+        {!!(item.verificationDocuments?.appointmentLetter || item.verificationDocuments?.logo) && (
+          <Text style={[styles.detailText, { color: Colors.primary, fontWeight: '600', marginTop: 2 }]}>
+            📎 Verification Document Attached (Tap to view)
+          </Text>
+        )}
       </View>
 
       <View style={styles.actionRow}>
         <TouchableOpacity 
           style={[styles.actionBtn, { flex: 0.3, backgroundColor: Colors.error + '22', borderColor: Colors.error + '44', borderWidth: 1 }]}
-          onPress={() => handleDeleteOrganizer(item)}
+          onPress={(e) => {
+            e.stopPropagation();
+            handleDeleteOrganizer(item);
+          }}
         >
           <Ionicons name="trash" size={20} color={Colors.error} />
         </TouchableOpacity>
@@ -127,7 +160,10 @@ export default function AdminHistory() {
         {item.verificationStatus === 'verified' ? (
           <TouchableOpacity 
             style={[styles.actionBtn, styles.rejectBtn]}
-            onPress={() => handleOrganizerStatus(item, 'rejected')}
+            onPress={(e) => {
+              e.stopPropagation();
+              handleOrganizerStatus(item, 'rejected');
+            }}
           >
             <Ionicons name="close-circle-outline" size={20} color={Colors.error} />
             <Text style={[styles.actionText, { color: Colors.error }]}>Remove Access</Text>
@@ -135,14 +171,17 @@ export default function AdminHistory() {
         ) : (
           <TouchableOpacity 
             style={[styles.actionBtn, styles.approveBtn]}
-            onPress={() => handleOrganizerStatus(item, 'verified')}
+            onPress={(e) => {
+              e.stopPropagation();
+              handleOrganizerStatus(item, 'verified');
+            }}
           >
-            <Ionicons name="checkmark" size={20} color="#fff" />
-            <Text style={[styles.actionText, { color: '#fff' }]}>Approve</Text>
+            <Ionicons name="checkmark-circle-outline" size={20} color="#fff" />
+            <Text style={[styles.actionText, { color: '#fff' }]}>Re-Approve</Text>
           </TouchableOpacity>
         )}
       </View>
-    </View>
+    </TouchableOpacity>
   );
 
   const renderEvent = ({ item }: { item: Post }) => (
@@ -274,6 +313,171 @@ export default function AdminHistory() {
           }
         />
       )}
+
+      {/* Organizer Details Modal */}
+      <Modal
+        visible={!!selectedOrganizer}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setSelectedOrganizer(null)}
+        statusBarTranslucent
+      >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{flex: 1}}>
+          <View style={styles.modalOverlay}>
+            <LinearGradient colors={[Colors.bgCard, Colors.bgCardAlt]} style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Organizer Details</Text>
+                <TouchableOpacity onPress={() => setSelectedOrganizer(null)}>
+                  <Ionicons name="close" size={24} color={Colors.textPrimary} />
+                </TouchableOpacity>
+              </View>
+              
+              {selectedOrganizer && (
+                <ScrollView contentContainerStyle={styles.modalScroll}>
+                  <View style={styles.modalAvatarContainer}>
+                    <View style={[styles.avatar, { width: 80, height: 80, borderRadius: 40 }]}>
+                      <Text style={[styles.avatarText, { fontSize: 32 }]}>
+                        {selectedOrganizer.displayName?.charAt(0).toUpperCase() || 'O'}
+                      </Text>
+                    </View>
+                    <Text style={styles.modalName}>{selectedOrganizer.displayName}</Text>
+                    <Text style={styles.modalRole}>
+                      {selectedOrganizer.verificationStatus === 'verified' ? 'Verified Organizer' : 'Rejected / Inactive Organizer'}
+                    </Text>
+                  </View>
+
+                  <View style={styles.modalSection}>
+                    <Text style={styles.modalSectionTitle}>Contact Information</Text>
+                    <View style={styles.modalFieldRow}>
+                      <Ionicons name="mail-outline" size={20} color={Colors.textSecondary} />
+                      <Text style={styles.modalFieldValue}>{selectedOrganizer.email}</Text>
+                    </View>
+                    {!!(selectedOrganizer.contactNumber || selectedOrganizer.phoneNumber) && (
+                      <View style={styles.modalFieldRow}>
+                        <Ionicons name="call-outline" size={20} color={Colors.textSecondary} />
+                        <Text style={styles.modalFieldValue}>{selectedOrganizer.contactNumber || selectedOrganizer.phoneNumber}</Text>
+                      </View>
+                    )}
+                    {!!selectedOrganizer.website && (
+                      <View style={styles.modalFieldRow}>
+                        <Ionicons name="globe-outline" size={20} color={Colors.textSecondary} />
+                        <Text style={styles.modalFieldValue}>{selectedOrganizer.website}</Text>
+                      </View>
+                    )}
+                  </View>
+
+                  <View style={styles.modalSection}>
+                    <Text style={styles.modalSectionTitle}>Organization Details</Text>
+                    {!!selectedOrganizer.organizationName && (
+                      <View style={styles.modalFieldRow}>
+                        <Ionicons name="business-outline" size={20} color={Colors.textSecondary} />
+                        <Text style={styles.modalFieldValue}>{selectedOrganizer.organizationName}</Text>
+                      </View>
+                    )}
+                    {!!selectedOrganizer.organizationType && (
+                      <View style={styles.modalFieldRow}>
+                        <Ionicons name="pricetag-outline" size={20} color={Colors.textSecondary} />
+                        <Text style={styles.modalFieldValue}>Type: {selectedOrganizer.organizationType}</Text>
+                      </View>
+                    )}
+                    {!!selectedOrganizer.ieeeSection && (
+                      <View style={styles.modalFieldRow}>
+                        <Ionicons name="location-outline" size={20} color={Colors.textSecondary} />
+                        <Text style={styles.modalFieldValue}>Section: {selectedOrganizer.ieeeSection}</Text>
+                      </View>
+                    )}
+                    {!!(selectedOrganizer.university || selectedOrganizer.branch) && (
+                      <View style={styles.modalFieldRow}>
+                        <Ionicons name="school-outline" size={20} color={Colors.textSecondary} />
+                        <Text style={styles.modalFieldValue}>University / Branch: {selectedOrganizer.university || selectedOrganizer.branch}</Text>
+                      </View>
+                    )}
+                    {!!selectedOrganizer.committeePosition && (
+                      <View style={styles.modalFieldRow}>
+                        <Ionicons name="person-outline" size={20} color={Colors.textSecondary} />
+                        <Text style={styles.modalFieldValue}>Position: {selectedOrganizer.committeePosition}</Text>
+                      </View>
+                    )}
+                    {!!(selectedOrganizer.organizationDescription || selectedOrganizer.bio) && (
+                      <View style={{ marginTop: Spacing.sm }}>
+                        <Text style={[styles.modalFieldValue, { color: Colors.textSecondary, fontStyle: 'italic' }]}>
+                          "{selectedOrganizer.organizationDescription || selectedOrganizer.bio}"
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+
+                  {/* Verification Documents */}
+                  {!!(selectedOrganizer.verificationDocuments?.appointmentLetter || selectedOrganizer.verificationDocuments?.logo || selectedOrganizer.photoURL) && (
+                    <View style={styles.modalSection}>
+                      <Text style={styles.modalSectionTitle}>Verification Documents</Text>
+                      {!!selectedOrganizer.verificationDocuments?.appointmentLetter && (
+                        <TouchableOpacity 
+                          style={[styles.modalFieldRow, { backgroundColor: Colors.primary + '15', padding: Spacing.sm, borderRadius: BorderRadius.md, marginTop: Spacing.xs }]}
+                          onPress={() => Linking.openURL(selectedOrganizer.verificationDocuments!.appointmentLetter!)}
+                        >
+                          <Ionicons name="document-attach" size={22} color={Colors.primary} />
+                          <Text style={[styles.modalFieldValue, { color: Colors.primary, fontWeight: '700', marginLeft: 8 }]}>
+                            View Appointment Letter ↗
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                      {!!(selectedOrganizer.verificationDocuments?.logo || selectedOrganizer.photoURL) && (
+                        <View style={{ marginTop: Spacing.md, alignItems: 'center' }}>
+                          <Image 
+                            source={{ uri: selectedOrganizer.verificationDocuments?.logo || selectedOrganizer.photoURL }} 
+                            style={{ width: 100, height: 100, borderRadius: 12, borderWidth: 1, borderColor: Colors.border }}
+                            resizeMode="contain"
+                          />
+                          <Text style={[styles.detailText, { marginTop: 4, color: Colors.textSecondary }]}>Organization Logo</Text>
+                        </View>
+                      )}
+                    </View>
+                  )}
+
+                  <View style={styles.modalActions}>
+                    <TouchableOpacity 
+                      style={[styles.actionBtn, { flex: 0.35, backgroundColor: Colors.error + '22', borderColor: Colors.error + '44', borderWidth: 1, paddingVertical: Spacing.lg }]}
+                      onPress={() => {
+                        const org = selectedOrganizer;
+                        setSelectedOrganizer(null);
+                        handleDeleteOrganizer(org);
+                      }}
+                    >
+                      <Ionicons name="trash" size={22} color={Colors.error} />
+                    </TouchableOpacity>
+                    {selectedOrganizer.verificationStatus === 'verified' ? (
+                      <TouchableOpacity 
+                        style={[styles.actionBtn, styles.rejectBtn, { paddingVertical: Spacing.lg }]}
+                        onPress={() => {
+                          const org = selectedOrganizer;
+                          setSelectedOrganizer(null);
+                          handleOrganizerStatus(org, 'rejected');
+                        }}
+                      >
+                        <Ionicons name="close-circle-outline" size={22} color={Colors.error} />
+                        <Text style={[styles.actionText, { color: Colors.error }]}>Remove Access</Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <TouchableOpacity 
+                        style={[styles.actionBtn, styles.approveBtn, { paddingVertical: Spacing.lg }]}
+                        onPress={() => {
+                          const org = selectedOrganizer;
+                          setSelectedOrganizer(null);
+                          handleOrganizerStatus(org, 'verified');
+                        }}
+                      >
+                        <Ionicons name="checkmark-circle-outline" size={22} color="#fff" />
+                        <Text style={[styles.actionText, { color: '#fff' }]}>Re-Approve</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </ScrollView>
+              )}
+            </LinearGradient>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -319,4 +523,19 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: FontSize.xl, fontWeight: 'bold', color: Colors.textPrimary, marginTop: Spacing.lg, marginBottom: Spacing.sm },
   emptyText: { fontSize: FontSize.md, color: Colors.textSecondary },
   statusText: { fontSize: FontSize.xs, fontWeight: 'bold', marginTop: 4, opacity: 0.8 },
+  
+  // Modal styles
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
+  modalContent: { borderTopLeftRadius: BorderRadius.xl, borderTopRightRadius: BorderRadius.xl, padding: Spacing.xl, maxHeight: '88%', borderWidth: 1, borderColor: Colors.border },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.lg },
+  modalTitle: { fontSize: FontSize.xl, fontWeight: 'bold', color: Colors.textPrimary },
+  modalScroll: { paddingBottom: Spacing.xxl },
+  modalAvatarContainer: { alignItems: 'center', marginBottom: Spacing.xl },
+  modalName: { fontSize: FontSize.xl, fontWeight: 'bold', color: Colors.textPrimary, marginTop: Spacing.md },
+  modalRole: { fontSize: FontSize.sm, color: Colors.primary, fontWeight: '600', marginTop: 2 },
+  modalSection: { marginBottom: Spacing.xl, backgroundColor: Colors.bgSurface, padding: Spacing.lg, borderRadius: BorderRadius.lg },
+  modalSectionTitle: { fontSize: FontSize.md, fontWeight: 'bold', color: Colors.textPrimary, marginBottom: Spacing.md, textTransform: 'uppercase', letterSpacing: 0.5 },
+  modalFieldRow: { flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.sm, gap: Spacing.sm },
+  modalFieldValue: { fontSize: FontSize.md, color: Colors.textPrimary, flex: 1 },
+  modalActions: { flexDirection: 'row', gap: Spacing.md, marginTop: Spacing.md },
 });

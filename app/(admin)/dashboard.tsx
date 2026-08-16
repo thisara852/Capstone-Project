@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, Modal, ScrollView, RefreshControl, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, Modal, ScrollView, RefreshControl, KeyboardAvoidingView, Platform, Linking, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useUserStore, UserProfile } from '../../store/userStore';
@@ -29,15 +29,16 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<Tab>('organizers');
   const [selectedOrganizer, setSelectedOrganizer] = useState<UserProfile | null>(null);
 
-  const pendingOrganizers = organizers.filter(o => o.verificationStatus === 'pending');
-  const pendingEvents = events.filter(e => e.status === 'pending');
+  const pendingOrganizers = organizers
+    .filter(o => o.verificationStatus === 'pending' || !o.verificationStatus)
+    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  const pendingEvents = events
+    .filter(e => e.status === 'pending')
+    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
   useEffect(() => {
     fetchOrganizers();
     fetchEvents();
-    return () => {
-      cleanup();
-    };
   }, []);
 
   const handleOrganizerAction = (user: UserProfile, status: 'verified' | 'rejected') => {
@@ -86,7 +87,7 @@ export default function AdminDashboard() {
       <View style={styles.cardHeader}>
         <View style={styles.cardHeaderLeft}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{item.displayName?.charAt(0).toUpperCase()}</Text>
+            <Text style={styles.avatarText}>{item.displayName?.charAt(0).toUpperCase() || 'O'}</Text>
           </View>
           <View>
             <Text style={styles.cardTitle}>{item.displayName}</Text>
@@ -103,8 +104,26 @@ export default function AdminDashboard() {
       
       <View style={styles.detailsBox}>
         {!!item.organizationName && <Text style={styles.detailText}>🏢 {item.organizationName}</Text>}
-        {!!item.ieeeSection && <Text style={styles.detailText}>🌐 Section: {item.ieeeSection}</Text>}
-        {!!item.bio && <Text style={styles.detailText} numberOfLines={2}>📝 {item.bio}</Text>}
+        {!!(item.organizationType || item.ieeeSection) && (
+          <Text style={styles.detailText}>🌐 {item.organizationType ? `${item.organizationType} • ` : ''}{item.ieeeSection || ''}</Text>
+        )}
+        {!!(item.university || item.branch) && (
+          <Text style={styles.detailText}>🎓 {item.university || item.branch}</Text>
+        )}
+        {!!item.committeePosition && (
+          <Text style={styles.detailText}>👤 Position: {item.committeePosition}</Text>
+        )}
+        {!!(item.contactNumber || item.phoneNumber) && (
+          <Text style={styles.detailText}>📞 {item.contactNumber || item.phoneNumber}</Text>
+        )}
+        {!!(item.organizationDescription || item.bio) && (
+          <Text style={styles.detailText} numberOfLines={2}>📝 {item.organizationDescription || item.bio}</Text>
+        )}
+        {!!(item.verificationDocuments?.appointmentLetter || item.verificationDocuments?.logo) && (
+          <Text style={[styles.detailText, { color: Colors.primary, fontWeight: '600', marginTop: 2 }]}>
+            📎 Verification Document Attached (Tap card to view)
+          </Text>
+        )}
       </View>
 
       <View style={styles.actionRow}>
@@ -205,25 +224,18 @@ export default function AdminDashboard() {
         </View>
         <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
           <TouchableOpacity 
-            onPress={() => router.push('/(tabs)')} 
-            style={[styles.logoutBtn, { backgroundColor: Colors.bgSurface }]}
-          >
-            <Ionicons name="home-outline" size={24} color={Colors.textSecondary} />
-          </TouchableOpacity>
-          <TouchableOpacity 
             onPress={() => router.push('/(admin)/history')} 
-            style={[styles.logoutBtn, { backgroundColor: Colors.primary + '22' }]}
+            style={[styles.headerActionBtn, { backgroundColor: Colors.primary + '22' }]}
+            accessibilityLabel="History"
           >
-            <Ionicons name="time-outline" size={24} color={Colors.primary} />
+            <Ionicons name="time-outline" size={22} color={Colors.primary} />
           </TouchableOpacity>
           <TouchableOpacity 
-            onPress={async () => {
-              await logout();
-              router.replace('/(auth)/login');
-            }} 
-            style={styles.logoutBtn}
+            onPress={() => router.replace('/(tabs)')} 
+            style={[styles.headerActionBtn, { backgroundColor: Colors.bgCard, borderWidth: 1, borderColor: Colors.border }]}
+            accessibilityLabel="Back to Main Feed"
           >
-            <Ionicons name="log-out-outline" size={24} color={Colors.error} />
+            <Ionicons name="arrow-back" size={22} color={Colors.textPrimary} />
           </TouchableOpacity>
         </View>
       </View>
@@ -308,10 +320,10 @@ export default function AdminDashboard() {
                   <Ionicons name="mail-outline" size={20} color={Colors.textSecondary} />
                   <Text style={styles.modalFieldValue}>{selectedOrganizer.email}</Text>
                 </View>
-                {!!selectedOrganizer.phoneNumber && (
+                {!!(selectedOrganizer.contactNumber || selectedOrganizer.phoneNumber) && (
                   <View style={styles.modalFieldRow}>
                     <Ionicons name="call-outline" size={20} color={Colors.textSecondary} />
-                    <Text style={styles.modalFieldValue}>{selectedOrganizer.phoneNumber}</Text>
+                    <Text style={styles.modalFieldValue}>{selectedOrganizer.contactNumber || selectedOrganizer.phoneNumber}</Text>
                   </View>
                 )}
                 {!!selectedOrganizer.website && (
@@ -330,24 +342,66 @@ export default function AdminDashboard() {
                     <Text style={styles.modalFieldValue}>{selectedOrganizer.organizationName}</Text>
                   </View>
                 )}
+                {!!selectedOrganizer.organizationType && (
+                  <View style={styles.modalFieldRow}>
+                    <Ionicons name="pricetag-outline" size={20} color={Colors.textSecondary} />
+                    <Text style={styles.modalFieldValue}>Type: {selectedOrganizer.organizationType}</Text>
+                  </View>
+                )}
                 {!!selectedOrganizer.ieeeSection && (
                   <View style={styles.modalFieldRow}>
                     <Ionicons name="location-outline" size={20} color={Colors.textSecondary} />
                     <Text style={styles.modalFieldValue}>Section: {selectedOrganizer.ieeeSection}</Text>
                   </View>
                 )}
-                {!!selectedOrganizer.branch && (
+                {!!(selectedOrganizer.university || selectedOrganizer.branch) && (
                   <View style={styles.modalFieldRow}>
                     <Ionicons name="school-outline" size={20} color={Colors.textSecondary} />
-                    <Text style={styles.modalFieldValue}>Branch: {selectedOrganizer.branch}</Text>
+                    <Text style={styles.modalFieldValue}>University / Branch: {selectedOrganizer.university || selectedOrganizer.branch}</Text>
                   </View>
                 )}
-                {!!selectedOrganizer.bio && (
+                {!!selectedOrganizer.committeePosition && (
+                  <View style={styles.modalFieldRow}>
+                    <Ionicons name="person-outline" size={20} color={Colors.textSecondary} />
+                    <Text style={styles.modalFieldValue}>Position: {selectedOrganizer.committeePosition}</Text>
+                  </View>
+                )}
+                {!!(selectedOrganizer.organizationDescription || selectedOrganizer.bio) && (
                   <View style={{ marginTop: Spacing.sm }}>
-                    <Text style={[styles.modalFieldValue, { color: Colors.textSecondary, fontStyle: 'italic' }]}>"{selectedOrganizer.bio}"</Text>
+                    <Text style={[styles.modalFieldValue, { color: Colors.textSecondary, fontStyle: 'italic' }]}>
+                      "{selectedOrganizer.organizationDescription || selectedOrganizer.bio}"
+                    </Text>
                   </View>
                 )}
               </View>
+
+              {/* Verification Documents */}
+              {!!(selectedOrganizer.verificationDocuments?.appointmentLetter || selectedOrganizer.verificationDocuments?.logo || selectedOrganizer.photoURL) && (
+                <View style={styles.modalSection}>
+                  <Text style={styles.modalSectionTitle}>Verification Documents</Text>
+                  {!!selectedOrganizer.verificationDocuments?.appointmentLetter && (
+                    <TouchableOpacity 
+                      style={[styles.modalFieldRow, { backgroundColor: Colors.primary + '15', padding: Spacing.sm, borderRadius: BorderRadius.md, marginTop: Spacing.xs }]}
+                      onPress={() => Linking.openURL(selectedOrganizer.verificationDocuments!.appointmentLetter!)}
+                    >
+                      <Ionicons name="document-attach" size={22} color={Colors.primary} />
+                      <Text style={[styles.modalFieldValue, { color: Colors.primary, fontWeight: '700', marginLeft: 8 }]}>
+                        View Appointment Letter ↗
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                  {!!(selectedOrganizer.verificationDocuments?.logo || selectedOrganizer.photoURL) && (
+                    <View style={{ marginTop: Spacing.md, alignItems: 'center' }}>
+                      <Image 
+                        source={{ uri: selectedOrganizer.verificationDocuments?.logo || selectedOrganizer.photoURL }} 
+                        style={{ width: 100, height: 100, borderRadius: 12, borderWidth: 1, borderColor: Colors.border }}
+                        resizeMode="contain"
+                      />
+                      <Text style={[styles.detailText, { marginTop: 4, color: Colors.textSecondary }]}>Organization Logo</Text>
+                    </View>
+                  )}
+                </View>
+              )}
 
               <View style={styles.modalActions}>
                 {selectedOrganizer.verificationStatus !== 'rejected' && (
@@ -432,6 +486,7 @@ const styles = StyleSheet.create({
   },
   greeting: { fontSize: FontSize.xl, fontWeight: 'bold', color: Colors.primary },
   orgName: { fontSize: FontSize.md, color: Colors.textSecondary, marginTop: 4 },
+  headerActionBtn: { padding: 8, borderRadius: BorderRadius.full },
   logoutBtn: { padding: 8, backgroundColor: Colors.error + '22', borderRadius: BorderRadius.full },
   statsRow: { flexDirection: 'row', paddingHorizontal: Spacing.lg, gap: Spacing.md, marginBottom: Spacing.lg },
   statBox: { flex: 1, backgroundColor: Colors.bgCard, padding: Spacing.md, borderRadius: BorderRadius.lg, borderWidth: 1, borderColor: Colors.border, alignItems: 'center' },

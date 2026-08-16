@@ -61,6 +61,8 @@ export interface UserProfile {
   organizationMemberships?: string[];
   // Organizer fields
   organizationName?: string;
+  organizationType?: string;
+  committeePosition?: string;
   ieeeSection?: string;
   organizationDescription?: string;
   verificationStatus?: 'pending' | 'verified' | 'rejected';
@@ -76,6 +78,7 @@ export interface UserProfile {
   linkedIn?: string;
   website?: string;
   createdAt: number;
+  updatedAt?: number;
 }
 
 interface UserStore {
@@ -206,12 +209,18 @@ export const useUserStore = create<UserStore>()(
           ...baseProfile,
           role: 'organizer',
           organizationName: profileData.organizationName || '',
+          organizationType: profileData.organizationType || '',
           ieeeSection: profileData.ieeeSection || '',
-          organizationDescription: profileData.organizationDescription || '',
+          university: profileData.university || '',
+          committeePosition: profileData.committeePosition || '',
+          organizationDescription: profileData.organizationDescription || profileData.bio || '',
           verificationStatus: 'pending',
           verified: false,
-          contactNumber: profileData.contactNumber || '',
+          phoneNumber: profileData.phoneNumber || profileData.contactNumber || '',
+          contactNumber: profileData.contactNumber || profileData.phoneNumber || '',
           website: profileData.website || '',
+          photoURL: profileData.photoURL || '',
+          verificationDocuments: profileData.verificationDocuments || {},
         };
       } else {
         newProfile = {
