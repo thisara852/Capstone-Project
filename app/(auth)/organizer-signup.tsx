@@ -173,10 +173,13 @@ export default function OrganizerSignupScreen() {
         role: 'organizer' as const,
         displayName: formData.organizerName,
         organizationName: formData.organizationName,
+        organizationType: formData.organizationType,
+        committeePosition: formData.committeePosition,
         ieeeSection: formData.ieeeSection,
         university: formData.university || undefined,
         organizationDescription: formData.organizationDescription,
         contactNumber: formData.contactNumber,
+        phoneNumber: formData.contactNumber,
         website: formData.website || undefined,
         photoURL: logoUrl || undefined,
         verificationDocuments: {
