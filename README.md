@@ -41,17 +41,5 @@
 
 ---
 
-## 🏗️ System Architecture
 
-```mermaid
-graph TD
-    A[Mobile Client - Expo / React Native] --> B[Expo Router & Navigation]
-    B --> C[State Management & Stores]
-    C --> D[Firebase Auth & Firestore]
-    C --> E[Hugging Face Inference API]
-    E -->|Zero-Shot Classification| F[Smart Feed Personalization]
-    D -->|Realtime Data & Storage| A
-
-
----
 
