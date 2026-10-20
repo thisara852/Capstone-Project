@@ -52,37 +52,6 @@ graph TD
     E -->|Zero-Shot Classification| F[Smart Feed Personalization]
     D -->|Realtime Data & Storage| A
 
-## 📂 Folder Structure
 
-Capstone-Project/
-├── app/                      # Main screen routes & navigation
-│   ├── (admin)/              # Admin management screens
-│   ├── (auth)/               # Sign In, Sign Up, & Password Recovery
-│   ├── (organizer)/          # Event organizers control panel
-│   ├── (settings)/           # User & application settings
-│   ├── (tabs)/               # Bottom Tab Navigation
-│   │   ├── index.tsx         # Home / Personalized Feed
-│   │   ├── groups.tsx        # Technical Groups & SIGs
-│   │   ├── search.tsx        # Search members, events, articles
-│   │   ├── tickets.tsx       # Registered event tickets
-│   │   ├── notifications.tsx # Alerts & Updates
-│   │   └── profile.tsx       # User Profile & Badges
-│   ├── article/              # Article view & creation
-│   ├── branch/               # IEEE Student Branch info & chapters
-│   ├── chat/                 # Messaging & chat rooms
-│   ├── group/                # Group discussions & member lists
-│   ├── post/                 # Post creation & details
-│   └── ticket/               # Ticket pass details
-├── assets/                   # App icons, splash screens, and images
-├── components/               # Modular, reusable UI components
-├── config/                   # Firebase & API configurations
-├── services/                 # NLP service & external API integrations
-├── store/                    # Global state management
-├── types/                    # TypeScript interfaces & types
-├── utils/                    # Helper functions & formatters
-├── app.json                  # Expo project configuration
-├── eas.json                  # EAS build settings
-├── package.json              # Project dependencies & scripts
-└── tsconfig.json             # TypeScript configuration
+---
 
-## 🛠️ Tech Stack
